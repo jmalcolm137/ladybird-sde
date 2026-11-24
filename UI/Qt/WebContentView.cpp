@@ -382,6 +382,11 @@ WebContentView::WebContentView(QWidget* window, Optional<u64> hub_view_id, WebCo
 
 WebContentView::~WebContentView()
 {
+#if defined(Q_OS_MACOS)
+    // An assistive technology can still hold elements of this view's accessibility tree, which goes away with it.
+    uninstall_accessibility(this);
+#endif
+
 #ifdef LADYBIRD_QT_USE_IOSURFACE_LAYER
     destroy_iosurface_layer();
 #elif defined(LADYBIRD_QT_USE_VULKAN_WINDOW)
@@ -809,6 +814,9 @@ static bool is_browser_reserved_shortcut(QKeyEvent const& event)
         return true;
 
     if (modifiers == (Qt::ControlModifier | Qt::ShiftModifier) && (key == Qt::Key_BracketLeft || key == Qt::Key_BracketRight))
+        return true;
+#else
+    if (modifiers == Qt::ControlModifier && key == Qt::Key_F4)
         return true;
 #endif
 
