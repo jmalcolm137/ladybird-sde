@@ -116,6 +116,21 @@ The install places:
 * `share/res/apps/Ladybird.af` — the SDE app file the Taskbar menu and quick
   launch resolve
 
+## Flatpak
+
+`scripts/make-flatpak.sh` packages an existing engine and frontend build as a
+single-file bundle, using the Freedesktop 26.08 runtime and the private app id
+`io.github.jmalcolm137.LadybirdSDE`. The distinct id and resource names mean it
+can be installed alongside the upstream `org.ladybird.Ladybird` Flatpak; the
+two keep separate profiles, caches, and desktop entries.
+
+```sh
+flatpak install --user flathub org.freedesktop.Sdk//26.08 \
+                               org.freedesktop.Platform//26.08
+scripts/make-flatpak.sh 2026.11.24
+flatpak install --user build/flatpak/LadybirdSDE-2026.11.24-x86_64.flatpak
+```
+
 ## Testing without the engine
 
 ```sh
