@@ -862,7 +862,7 @@ impl DeclarationBlock {
             *state = DeclarationBlockState::Mutable(Rc::new(RefCell::new(DeclarationBlockOwner {
                 data: data.clone(),
                 identity: NEXT_DECLARATION_BLOCK_IDENTITY
-                    .try_update(Ordering::Relaxed, Ordering::Relaxed, |value| value.checked_add(1))
+                    .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |value| value.checked_add(1))
                     .expect("declaration block identity overflow"),
                 revision: 0,
             })));

@@ -877,7 +877,7 @@ static NEXT_RULE_IDENTITY: AtomicU64 = AtomicU64::new(1);
 
 fn reserve_rule_identities(count: u64) -> u64 {
     NEXT_RULE_IDENTITY
-        .try_update(Ordering::Relaxed, Ordering::Relaxed, |value| value.checked_add(count))
+        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |value| value.checked_add(count))
         .expect("rule identity overflow")
 }
 

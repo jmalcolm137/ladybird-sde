@@ -405,7 +405,7 @@ impl NativeStyleSheet {
     pub(crate) fn new(rules: Rc<NativeRuleList>, media: MediaList) -> Rc<Self> {
         Rc::new(Self {
             identity: NEXT_SHEET_IDENTITY
-                .try_update(Ordering::Relaxed, Ordering::Relaxed, |value| value.checked_add(1))
+                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |value| value.checked_add(1))
                 .expect("stylesheet identity overflow"),
             rules,
             media,
