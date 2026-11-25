@@ -23,7 +23,8 @@
         "--talk-name=org.freedesktop.Notifications",
         "--env=LADYBIRD_ENGINE_HOST=/app/libexec/LadybirdEngine",
         "--env=LADYBIRD_SOURCE_DIR=/app",
-        "--env=SERENITY_RES_ROOT=/app/share/res"
+        "--env=SERENITY_RES_ROOT=/app/share/res",
+        "--talk-name=org.freedesktop.Flatpak"
     ],
     "cleanup": [
         "/sbin",

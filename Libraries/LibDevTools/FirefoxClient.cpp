@@ -336,6 +336,38 @@ ErrorOr<void> FirefoxClient::ensure_running(u16 port, u64 tab_id)
         return {};
 
     auto installation = find_firefox_installation();
+#if defined(AK_OS_LINUX)
+    if (!installation.has_value() && Core::Environment::get("FLATPAK_ID"sv).has_value()) {
+        // The Flatpak cannot execute the host's Firefox directly, and the app
+        // image has no Firefox of its own. Run the host's browser through the
+        // Flatpak portal with a profile it can read (the app data directory is a
+        // real host path), so the DevTools client can reach localhost.
+        TRY(prepare_firefox_profile(profile_directory()));
+
+        Vector<ByteString> arguments {
+            "--host"sv,
+            "firefox"sv,
+            "-no-remote"sv,
+            "-profile"sv,
+            profile_directory().string(),
+            "--width"sv,
+            "1280"sv,
+            "--height"sv,
+            "850"sv,
+            ByteString::formatted("about:devtools-toolbox?type=tab&id={}&host=localhost&port={}", tab_id, port),
+        };
+
+        auto process = TRY(Core::Process::spawn({
+            .name = "devtools-client"sv,
+            .executable = "flatpak-spawn"sv,
+            .search_for_executable_in_path = true,
+            .die_with_parent = true,
+            .arguments = move(arguments),
+        }));
+        m_process_id = process.pid();
+        return {};
+    }
+#endif
     if (!installation.has_value())
         return Error::from_string_literal("No Firefox installation was found");
 
