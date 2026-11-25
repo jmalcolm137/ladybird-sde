@@ -1,0 +1,150 @@
+name: Flatpak Release
+
+run-name: Flatpak ${{ inputs.version }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version, such as 2026.11.24'
+        required: true
+        type: string
+      ref:
+        description: 'Branch, tag or commit to build'
+        required: true
+        default: 'master'
+        type: string
+      publish:
+        description: 'Create a GitHub release with the bundle'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: flatpak-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  flatpak:
+    name: Build x86_64 bundle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    env:
+      APP_ID: io.github.jmalcolm137.LadybirdSDE
+      BUNDLE: LadybirdSDE-${{ inputs.version }}-x86_64.flatpak
+      MANIFEST: Meta/CMake/flatpak/io.github.jmalcolm137.LadybirdSDE.json
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          sudo apt-get clean
+          df -h /
+
+      - name: Install Flatpak tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y --noninteractive flathub \
+            org.freedesktop.Platform//26.08 \
+            org.freedesktop.Sdk//26.08 \
+            org.freedesktop.Sdk.Extension.llvm22//26.08 \
+            org.freedesktop.Sdk.Extension.rust-stable//26.08
+
+      - name: Fetch pinned sources
+        run: ./scripts/fetch-flatpak-sources.sh
+
+      - name: Set release version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+
+          version = os.environ['VERSION']
+
+          path = 'Meta/CMake/flatpak/io.github.jmalcolm137.LadybirdSDE.json'
+          with open(path) as file:
+              manifest = json.load(file)
+          ladybird = next(module for module in manifest['modules'] if module['name'] == 'Ladybird')
+          ladybird['config-opts'].append(f'-DLADYBIRD_VERSION={version}')
+          with open(path, 'w') as file:
+              json.dump(manifest, file, indent=4)
+              file.write('\n')
+
+          path = 'Meta/CMake/flatpak/sde/io.github.jmalcolm137.LadybirdSDE.metainfo.xml'
+          with open(path) as file:
+              metainfo = file.read()
+          import re
+          metainfo = re.sub(
+              r'<release version="[^"]*" date="[^"]*"/>',
+              f'<release version="{version}" date="{__import__("datetime").date.today().isoformat()}"/>',
+              metainfo,
+          )
+          with open(path, 'w') as file:
+              file.write(metainfo)
+          PY
+
+      - name: Build
+        run: |
+          flatpak-builder --user --force-clean --disable-rofiles-fuse \
+            --install-deps-from=flathub \
+            --repo=build/flatpak-repo --default-branch=stable \
+            build/flatpak-build "$MANIFEST"
+
+      - name: Bundle
+        run: |
+          flatpak build-bundle \
+            --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo \
+            build/flatpak-repo "$BUNDLE" "$APP_ID" stable
+          sha256sum "$BUNDLE" > "$BUNDLE.sha256"
+          ls -lh "$BUNDLE"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.BUNDLE }}
+          path: |
+            ${{ env.BUNDLE }}
+            ${{ env.BUNDLE }}.sha256
+          if-no-files-found: error
+
+      - name: Publish release
+        if: ${{ inputs.publish }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          tag="sde-$VERSION"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "$BUNDLE" "$BUNDLE.sha256" --clobber
+          else
+            cat > release-notes.md <<EOF
+          Source-built Flatpak of the LibGUI Ladybird SDE frontend.
+
+          - App id: \`$APP_ID\` (installs alongside upstream \`org.ladybird.Ladybird\`)
+          - Runtime: \`org.freedesktop.Platform//26.08\` (x86_64)
+          - Built with flatpak-builder from \`${{ inputs.ref }}\` at \`${{ github.sha }}\`
+
+          ## Install
+
+          \`\`\`sh
+          flatpak install --user ./$BUNDLE
+          flatpak run $APP_ID
+          \`\`\`
+          EOF
+            gh release create "$tag" "$BUNDLE" "$BUNDLE.sha256" \
+              --target "${{ github.sha }}" \
+              --title "Ladybird SDE Flatpak $VERSION" \
+              --notes-file release-notes.md
+          fi

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.jmalcolm137.LadybirdSDE</id>
+  <name>Ladybird SDE</name>
+  <summary>LibGUI frontend for the Ladybird web browser</summary>
+  <description>
+    <p>Ladybird SDE is a Serenity Desktop Environment frontend for the Ladybird
+    web browser. The web engine is an unmodified Ladybird build; only the
+    browser chrome is replaced with the LibGUI-for-Wayland stack.</p>
+  </description>
+  <launchable type="desktop-id">io.github.jmalcolm137.LadybirdSDE.desktop</launchable>
+  <url type="homepage">https://github.com/jmalcolm137/ladybird-sde</url>
+  <developer id="io.github.jmalcolm137">
+    <name>jmalcolm137</name>
+  </developer>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="2026.11.24" date="2026-11-24"/>
+  </releases>
+</component>

@@ -1,0 +1,7 @@
+#!/bin/sh
+# Flatpak entry point: point the LibGUI frontend at the bundled engine host and
+# resources, then exec the real binary.
+export LADYBIRD_ENGINE_HOST=/app/libexec/LadybirdEngine
+export LADYBIRD_SOURCE_DIR=/app
+export SERENITY_RES_ROOT=/app/share/res
+exec /app/bin/LadybirdSDE.real "$@"

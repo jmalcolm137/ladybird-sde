@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=Ladybird SDE
+GenericName=Web Browser
+Comment=LibGUI frontend for the Ladybird web browser
+Exec=LadybirdSDE %U
+TryExec=LadybirdSDE
+Icon=io.github.jmalcolm137.LadybirdSDE
+Terminal=false
+Categories=Network;WebBrowser;
+MimeType=text/html;application/xhtml+xml;x-scheme-handler/http;x-scheme-handler/https;x-scheme-handler/about;
+StartupNotify=true
+StartupWMClass=LadybirdSDE
+X-Flatpak=io.github.jmalcolm137.LadybirdSDE

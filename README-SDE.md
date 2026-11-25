@@ -80,14 +80,16 @@ LadybirdEngine`. If the host cannot launch Ladybird's sandbox, set
 `LADYBIRD_SDE_DISABLE_SANDBOX=1`; the frontend forwards `--disable-sandbox` to
 the engine host.
 
-This tree is built with the host's Rust 1.99.0, while upstream pins 1.98.0. Four
-`Atomic::fetch_update` calls were renamed to the 1.99 `try_update` spelling; with
-a 1.98 toolchain, revert those four one-line changes or use rustup's pinned
-toolchain. The engine uses the `libgui` Ladybird profile by default so it
+The tree stays on upstream's pinned Rust 1.98 spelling (`Atomic::fetch_update`),
+so it builds with both the host toolchain and the Freedesktop SDK's 1.98
+extension. Newer hosts warn that the method was renamed to `try_update`. The
+engine uses the `libgui` Ladybird profile by default so it
 does not contend with a running Qt Ladybird; set `LADYBIRD_SDE_PROFILE=default`
 to share the default Ladybird profile, or name another profile. The first build configures Ladybird and builds its helper
 processes and resources. `scripts/build-chrome.sh` compiles `UI/LibGUI` against
-the LibGUI-lagom tree.
+the LibGUI-lagom tree. `Meta/ladybird.py build -DLADYBIRD_BUILD_QT_UI=OFF
+LadybirdEngine` builds the engine host without the Qt UI; the Flatpak build uses
+that configuration, so it does not need Qt in the SDK.
 
 Window decorations, the menubar, and dropdown menus come from the LibGUI/LibWM
 stack in `../libgui-wayland`. Menubar menus are xdg popups; LibWM anchors them
@@ -118,18 +120,35 @@ The install places:
 
 ## Flatpak
 
-`scripts/make-flatpak.sh` packages an existing engine and frontend build as a
-single-file bundle, using the Freedesktop 26.08 runtime and the private app id
-`io.github.jmalcolm137.LadybirdSDE`. The distinct id and resource names mean it
-can be installed alongside the upstream `org.ladybird.Ladybird` Flatpak; the
-two keep separate profiles, caches, and desktop entries.
+Releases are built from source inside the Freedesktop 26.08 SDK by
+`.github/workflows/flatpak-release.yml`. Dispatching the workflow with a
+version, a ref, and whether to publish fetches the pinned LibGUI and Serenity
+sources, builds the engine and the LibGUI frontend with `flatpak-builder`, and
+attaches `LadybirdSDE-<version>-x86_64.flatpak` to a GitHub release.
+
+To run the same build locally:
 
 ```sh
-flatpak install --user flathub org.freedesktop.Sdk//26.08 \
-                               org.freedesktop.Platform//26.08
-scripts/make-flatpak.sh 2026.11.24
-flatpak install --user build/flatpak/LadybirdSDE-2026.11.24-x86_64.flatpak
+scripts/fetch-flatpak-sources.sh
+flatpak install --user flathub \
+    org.freedesktop.Platform//26.08 org.freedesktop.Sdk//26.08 \
+    org.freedesktop.Sdk.Extension.llvm22//26.08 \
+    org.freedesktop.Sdk.Extension.rust-stable//26.08
+flatpak-builder --user --force-clean --install-deps-from=flathub \
+    --repo=build/flatpak-repo --default-branch=stable \
+    build/flatpak-build Meta/CMake/flatpak/io.github.jmalcolm137.LadybirdSDE.json
+flatpak build-bundle --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo \
+    build/flatpak-repo LadybirdSDE-x86_64.flatpak \
+    io.github.jmalcolm137.LadybirdSDE stable
 ```
+
+The app id, menu name, icon, and desktop entry are private to this port, so the
+bundle installs next to the upstream `org.ladybird.Ladybird` Flatpak. The two
+keep separate profiles, caches, and menu entries.
+
+`scripts/make-flatpak.sh 2026.11.24` is still available for quickly packaging an
+existing host build. It is not used for releases, because its binaries are built
+against the host toolchain rather than the SDK.
 
 ## Testing without the engine
 
