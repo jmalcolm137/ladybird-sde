@@ -400,16 +400,18 @@ void BrowserWindow::show_crash_report(JsonObject const& event)
             m_engine->crash_report_close();
         };
 
-        m_crash_report_send_button = buttons.add<GUI::Button>("Send Report"_string);
-        m_crash_report_send_button->set_fixed_width(110);
+        m_crash_report_send_button = buttons.add<GUI::Button>("Open GitHub Issue"_string);
+        m_crash_report_send_button->set_fixed_width(140);
         m_crash_report_send_button->on_click = [this](auto) {
             auto description = String::from_byte_string(m_crash_report_description->text()).release_value();
             auto url = String::from_byte_string(m_crash_report_website->text()).release_value();
-            m_engine->crash_report_send(description, m_crash_report_include_website->is_checked(), url);
+            auto body = String::formatted("Crash report: {}\n\n{}\n\nWebsite: {}\n", m_crash_report_name, description,
+                m_crash_report_include_website->is_checked() ? url : String {});
+            if (body.is_error())
+                return;
+            add_tab(github_issue_url(String::formatted("Crash report: {}", m_crash_report_name).release_value(), body.value(), "crash-report"sv), true);
             if (m_crash_report_status)
-                m_crash_report_status->set_text("Sending crash report…"_string);
-            if (m_crash_report_send_button)
-                m_crash_report_send_button->set_enabled(false);
+                m_crash_report_status->set_text("Opened a prefilled issue in a new tab. Attach the report text from Show Report… there if needed."_string);
         };
     }
 

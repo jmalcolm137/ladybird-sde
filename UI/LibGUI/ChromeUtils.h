@@ -36,6 +36,33 @@ inline String safe_utf8_string(StringView text)
     return String::from_utf8_with_replacement_character(text);
 }
 
+// Percent-encodes a value for a GitHub issue URL's query string.
+inline String percent_encode_query_value(StringView value)
+{
+    StringBuilder builder;
+    auto const hex = "0123456789ABCDEF"sv;
+    for (auto byte : value.bytes()) {
+        if ((byte >= 'a' && byte <= 'z') || (byte >= 'A' && byte <= 'Z') || (byte >= '0' && byte <= '9') || byte == '-' || byte == '_' || byte == '.' || byte == '~') {
+            builder.append(static_cast<char>(byte));
+        } else {
+            builder.append('%');
+            builder.append(hex[(byte >> 4) & 0xf]);
+            builder.append(hex[byte & 0xf]);
+        }
+    }
+    return MUST(builder.to_string());
+}
+
+// A prefilled "new issue" page in the Ladybird SDE repository.
+inline String github_issue_url(String const& title, String const& body, StringView label)
+{
+    return String::formatted("https://github.com/jmalcolm137/ladybird-sde/issues/new?labels={}&title={}&body={}",
+        percent_encode_query_value(label),
+        percent_encode_query_value(title),
+        percent_encode_query_value(body))
+        .release_value();
+}
+
 // Returns the sanitized LADYBIRD_SDE_PROFILE name, rejecting path separators
 // or traversal components and falling back to "libgui".
 inline ByteString sanitized_profile_name()

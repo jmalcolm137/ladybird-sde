@@ -234,21 +234,27 @@ void BrowserTab::show_compat_report(JsonObject const& event)
                 m_engine.compat_report_retry(m_tab_id);
         };
 
-        m_compat_report_send_button = buttons.add<GUI::Button>("Send"_string);
-        m_compat_report_send_button->set_fixed_width(70);
+        m_compat_report_send_button = buttons.add<GUI::Button>("Open GitHub Issue"_string);
+        m_compat_report_send_button->set_fixed_width(140);
         m_compat_report_send_button->on_click = [this](auto) {
             auto description = String::from_byte_string(m_compat_report_description->text()).release_value();
             auto trimmed = description.trim_ascii_whitespace();
             if (trimmed.is_error() || trimmed.value().is_empty()) {
-                m_compat_report_status->set_text("Describe what is wrong with this website before sending."_string);
+                m_compat_report_status->set_text("Describe what is wrong with this website before reporting."_string);
                 m_compat_report_description->set_focus(true);
                 return;
             }
-            m_compat_report_send_button->set_enabled(false);
-            m_compat_report_retry_button->set_visible(false);
-            m_compat_report_status->set_text("Preparing report…"_string);
-            if (is_attached())
-                m_engine.compat_report_send(m_tab_id, description, m_compat_report_include_dumps->is_checked(), m_compat_report_include_screenshot->is_checked());
+            auto website = m_compat_report_website->text();
+            auto body = String::formatted("{}\n\n{}\n\nPage dumps requested: {}\nScreenshot requested: {}\n",
+                website,
+                description,
+                m_compat_report_include_dumps->is_checked() ? "yes" : "no",
+                m_compat_report_include_screenshot->is_checked() ? "yes" : "no");
+            if (body.is_error())
+                return;
+            if (on_open_new_tab)
+                on_open_new_tab(github_issue_url("Website compatibility issue"_string, body.value(), "compat-report"sv));
+            m_compat_report_status->set_text("Opened a prefilled issue in a new tab. Attach the report text there if needed."_string);
         };
 
         auto& close_button = buttons.add<GUI::Button>("Close"_string);
