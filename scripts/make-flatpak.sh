@@ -53,18 +53,9 @@ mkdir -p "$F/bin" "$F/libexec" "$F/lib/ladybird" "$F/share/applications" \
          "$F/share/icons/hicolor/32x32/apps" "$F/share/metainfo"
 
 echo "==> frontend"
-cp -a "$ROOT/build/chrome/Ladybird" "$F/bin/$APP_NAME.real"
-
-cat > "$F/bin/$APP_NAME" <<'EOF'
-#!/bin/sh
-# Flatpak entry point: point the LibGUI frontend at the bundled engine host and
-# resources, then exec the real binary.
-export LADYBIRD_ENGINE_HOST=/app/libexec/LadybirdEngine
-export LADYBIRD_SOURCE_DIR=/app
-export SERENITY_RES_ROOT=/app/share/res
-exec /app/bin/LadybirdSDE.real "$@"
-EOF
-chmod 0755 "$F/bin/$APP_NAME"
+# The executable basename is the Wayland app_id LibWM reports, so keep it as
+# LadybirdSDE and let the Flatpak metadata supply the environment.
+cp -a "$ROOT/build/chrome/Ladybird" "$F/bin/$APP_NAME"
 
 echo "==> engine host and helpers"
 cp -a "$LADYBIRD_BUILD/libexec/." "$F/libexec/"
@@ -123,6 +114,8 @@ cat > "$F/share/metainfo/$APP_ID.metainfo.xml" <<EOF
   <developer id="io.github.jmalcolm137">
     <name>jmalcolm137</name>
   </developer>
+  <metadata_license>0BSD</metadata_license>
+  <project_license>BSD-2-Clause</project_license>
   <content_rating type="oars-1.1"/>
   <releases>
     <release version="$VERSION" date="$(date +%Y-%m-%d)"/>
@@ -140,7 +133,7 @@ patch_elf() {
     file -b "$1" | grep -q ELF || return 0
     patchelf --force-rpath --set-rpath "$2" "$1"
 }
-patch_elf "$F/bin/$APP_NAME.real" '$ORIGIN/../lib'
+patch_elf "$F/bin/$APP_NAME" '$ORIGIN/../lib'
 for file in "$F"/libexec/*; do patch_elf "$file" '$ORIGIN/../lib/ladybird'; done
 for file in "$F"/lib/ladybird/*; do patch_elf "$file" '$ORIGIN'; done
 for file in "$F"/lib/liblagom*.so* "$F"/lib/libwm.so*; do patch_elf "$file" '$ORIGIN'; done
@@ -154,7 +147,10 @@ flatpak build-finish "$BUILD" \
     --filesystem=xdg-download \
     --filesystem=xdg-config/gtk-3.0:ro \
     --talk-name=org.freedesktop.portal.Desktop \
-    --talk-name=org.freedesktop.Notifications
+    --talk-name=org.freedesktop.Notifications \
+    --env=LADYBIRD_ENGINE_HOST=/app/libexec/LadybirdEngine \
+    --env=LADYBIRD_SOURCE_DIR=/app \
+    --env=SERENITY_RES_ROOT=/app/share/res
 
 echo "==> exporting bundle"
 flatpak build-export "$REPO" "$BUILD" stable
