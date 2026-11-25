@@ -76,6 +76,8 @@ public:
     String const& website_color_scheme() const { return m_website_color_scheme; }
     String const& preferred_contrast() const { return m_preferred_contrast; }
     String const& preferred_motion() const { return m_preferred_motion; }
+    String const& bookmarks_bar_mode() const { return m_bookmarks_bar_mode; }
+    void set_show_bookmarks_bar(String const& mode);
     void set_website_color_scheme(String const& color_scheme);
     void set_preferred_contrast(String const& contrast);
     void set_preferred_motion(String const& motion);
@@ -161,6 +163,7 @@ private:
     String m_website_color_scheme { "auto"_string };
     String m_preferred_contrast { "auto"_string };
     String m_preferred_motion { "auto"_string };
+    String m_bookmarks_bar_mode { "never"_string };
     ByteString m_exit_reason;
 };
 

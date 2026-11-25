@@ -38,6 +38,7 @@ public:
     bool is_unresponsive() const { return m_unresponsive; }
 
     Function<void(Gfx::IntSize)> on_resize;
+    Function<void()> on_hover;
     Function<void()> on_reload;
     Function<void(StringView type, Gfx::IntPoint position, GUI::MouseButton button, unsigned buttons, unsigned modifiers, int click_count)> on_mouse;
     Function<void(StringView type, Gfx::IntPoint position, unsigned modifiers, String const& text, Vector<String> const& urls)> on_drag;

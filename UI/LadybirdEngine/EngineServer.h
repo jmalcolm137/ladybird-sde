@@ -182,6 +182,7 @@ private:
     void handle_clipboard_changed(JsonObject const&);
     void handle_set_user_agent(JsonObject const&);
     void handle_set_navigator_compatibility_mode(JsonObject const&);
+    void handle_set_show_bookmarks_bar(JsonObject const&);
     void handle_set_website_color_scheme(JsonObject const&);
     void handle_set_preferred_contrast(JsonObject const&);
     void handle_set_preferred_motion(JsonObject const&);

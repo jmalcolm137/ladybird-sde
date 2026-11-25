@@ -97,13 +97,15 @@ public:
     void hide_find_bar();
     void set_bookmarked(bool bookmarked);
     void set_bookmarks(Vector<BookmarkEntry> const&);
-    void set_bookmarks_bar_visible(bool visible);
+    void set_bookmarks_bar_mode(String const& mode);
+    void set_bookmarks_bar_hovered(bool hovered);
     void set_loading(bool);
     void set_history(bool can_go_back, bool can_go_forward);
     void set_url(String const&);
     void set_title(String const&);
     void set_favicon(StringView path);
     void set_cursor(StringView name);
+    void refresh_bookmarks_bar_visibility();
     void set_status(StringView);
     void set_crashed(bool crashed);
     void set_unresponsive(bool unresponsive);
@@ -132,6 +134,7 @@ public:
     Function<void(bool)> on_loading_change;
     Function<void(Gfx::Bitmap const*)> on_favicon_change;
     Function<void(bool)> on_bookmark_change;
+    Function<void(String const&)> on_open_new_tab;
     Function<void()> on_hard_reload;
     Function<void(String const&, String const&, bool, bool)> on_permission_decision;
     Function<void(GUI::Widget&)> on_tabs_menu_request;
@@ -242,7 +245,8 @@ private:
     bool m_can_go_back { false };
     bool m_can_go_forward { false };
     bool m_bookmarked { false };
-    bool m_bookmarks_bar_visible { false };
+    String m_bookmarks_bar_mode { "never"_string };
+    bool m_bookmarks_bar_hovered { false };
     bool m_has_bookmarks { false };
     bool m_private { false };
 };

@@ -861,6 +861,14 @@ void EngineClient::set_navigator_compatibility_mode(String const& mode)
     send(event);
 }
 
+void EngineClient::set_show_bookmarks_bar(String const& value)
+{
+    JsonObject event;
+    event.set("type"sv, "set_show_bookmarks_bar"sv);
+    event.set("value"sv, value.bytes_as_string_view());
+    send(event);
+}
+
 void EngineClient::set_website_color_scheme(String const& color_scheme)
 {
     JsonObject event;

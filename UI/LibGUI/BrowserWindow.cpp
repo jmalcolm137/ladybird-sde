@@ -422,12 +422,16 @@ void BrowserWindow::create_actions()
     }, m_window.ptr());
     m_always_on_top_action->set_status_tip("Keep this window above other windows"_string);
 
-    m_bookmarks_bar_action = GUI::Action::create_checkable("Show &Bookmarks Bar"sv, { static_cast<u8>(Mod_Ctrl | Mod_Shift), Key_B }, [this](auto& action) {
-        m_show_bookmarks_bar = action.is_checked();
-        for (auto& tab : m_tabs)
-            tab->set_bookmarks_bar_visible(m_show_bookmarks_bar);
-    }, m_window.ptr());
-    m_bookmarks_bar_action->set_checked(false);
+    auto add_bookmarks_bar_mode = [&](StringView label, StringView value) {
+        auto mode = String::from_utf8(value).release_value();
+        auto action = GUI::Action::create_checkable(label, [this, mode](auto&) {
+            m_session.set_show_bookmarks_bar(mode);
+        }, m_window.ptr());
+        m_bookmarks_bar_actions.set(mode, move(action));
+    };
+    add_bookmarks_bar_mode("&Always"sv, "always"sv);
+    add_bookmarks_bar_mode("&Never"sv, "never"sv);
+    add_bookmarks_bar_mode("On &Hover"sv, "onHover"sv);
 
     m_close_tab_action = GUI::Action::create("&Close Tab"sv, { Mod_Ctrl, Key_W }, close_tab_icon, [this](auto&) {
         if (auto* tab = active_tab())
@@ -619,7 +623,10 @@ void BrowserWindow::create_menus()
     view_menu.add_action(*m_focus_location_action);
     view_menu.add_action(*m_fullscreen_action);
     view_menu.add_action(*m_always_on_top_action);
-    view_menu.add_action(*m_bookmarks_bar_action);
+    auto bookmarks_bar_menu = view_menu.add_submenu("Bookmarks &Bar"_string);
+    bookmarks_bar_menu->add_action(**m_bookmarks_bar_actions.get("always"sv));
+    bookmarks_bar_menu->add_action(**m_bookmarks_bar_actions.get("never"sv));
+    bookmarks_bar_menu->add_action(**m_bookmarks_bar_actions.get("onHover"sv));
     view_menu.add_separator();
 
     auto add_view_preference = [&](GUI::Menu& menu, HashMap<String, RefPtr<GUI::Action>>& actions, StringView label, StringView value, Function<void(String const&)> setter) {
@@ -730,7 +737,17 @@ void BrowserWindow::create_menus()
         show_about_dialog();
     }, m_window.ptr()));
 
+    set_bookmarks_bar_mode(m_bookmarks_bar_mode);
     update_view_preference_actions();
+}
+
+void BrowserWindow::set_bookmarks_bar_mode(String const& mode)
+{
+    m_bookmarks_bar_mode = mode;
+    for (auto& action : m_bookmarks_bar_actions)
+        action.value->set_checked(action.key == mode);
+    for (auto& tab : m_tabs)
+        tab->set_bookmarks_bar_mode(mode);
 }
 
 void BrowserWindow::update_view_preference_actions()
@@ -853,6 +870,9 @@ BrowserTab& BrowserWindow::add_tab(String const& url, bool activate, bool reques
         if (active_tab() == tab_pointer)
             update_window_title();
     };
+    tab->on_open_new_tab = [this](String const& url) {
+        add_tab(url, true);
+    };
     tab->on_bookmark_change = [this, tab_pointer](bool) {
         if (!tab_is_live(tab_pointer))
             return;
@@ -895,7 +915,7 @@ BrowserTab& BrowserWindow::add_tab(String const& url, bool activate, bool reques
 
     m_tabs.append(move(tab));
     tab_pointer->set_bookmarks(m_bookmarks);
-    tab_pointer->set_bookmarks_bar_visible(m_show_bookmarks_bar);
+    tab_pointer->set_bookmarks_bar_mode(m_session.bookmarks_bar_mode());
 
     // A restored tab that has not loaded yet shows its URL until the page
     // provides a title, matching the reference frontend.

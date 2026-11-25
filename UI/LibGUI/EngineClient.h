@@ -86,6 +86,7 @@ public:
     void set_clipboard_items(JsonArray items);
     void set_user_agent(String const& user_agent);
     void set_navigator_compatibility_mode(String const& mode);
+    void set_show_bookmarks_bar(String const& value);
     void set_website_color_scheme(String const& color_scheme);
     void set_preferred_contrast(String const& contrast);
     void set_preferred_motion(String const& motion);

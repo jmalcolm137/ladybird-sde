@@ -294,6 +294,14 @@ void BrowserSession::note_exit_reason(ByteString reason)
         m_exit_reason = move(reason);
 }
 
+void BrowserSession::set_show_bookmarks_bar(String const& mode)
+{
+    m_bookmarks_bar_mode = mode;
+    m_engine->set_show_bookmarks_bar(mode);
+    for (auto& window : m_windows)
+        window->set_bookmarks_bar_mode(mode);
+}
+
 void BrowserSession::set_website_color_scheme(String const& color_scheme)
 {
     m_website_color_scheme = color_scheme;
@@ -687,6 +695,11 @@ void BrowserSession::on_engine_event(JsonObject const& event)
             m_preferred_contrast = String::from_byte_string(*value).release_value();
         if (auto value = event.get_byte_string("motion"sv); value.has_value())
             m_preferred_motion = String::from_byte_string(*value).release_value();
+        if (auto value = event.get_byte_string("show_bookmarks_bar"sv); value.has_value()) {
+            m_bookmarks_bar_mode = String::from_byte_string(*value).release_value();
+            for (auto& window : m_windows)
+                window->set_bookmarks_bar_mode(m_bookmarks_bar_mode);
+        }
         for (auto& window : m_windows)
             window->update_view_preference_actions();
         return;

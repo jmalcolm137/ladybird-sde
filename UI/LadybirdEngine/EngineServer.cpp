@@ -116,10 +116,16 @@ EngineServer::EngineServer(NonnullOwnPtr<Core::LocalSocket> socket, ByteString f
     , m_frame_directory(move(frame_directory))
     , m_theme(move(theme))
 {
+    // Settings changed from about:settings are persisted by LibWebView. Tell the
+    // frontend about the ones it owns as soon as they change.
+    WebView::Application::settings().on_persist = [this](auto const&) {
+        send_view_preferences();
+    };
 }
 
 EngineServer::~EngineServer()
 {
+    WebView::Application::settings().on_persist = nullptr;
     EngineApplication::the().set_open_blank_new_tab_handler({});
     EngineApplication::the().set_open_new_window_handler({});
     EngineApplication::the().set_active_web_view_provider({});
@@ -477,6 +483,8 @@ void EngineServer::dispatch_command(JsonObject const& command)
         handle_set_user_agent(command);
     } else if (*type == "set_navigator_compatibility_mode"sv) {
         handle_set_navigator_compatibility_mode(command);
+    } else if (*type == "set_show_bookmarks_bar"sv) {
+        handle_set_show_bookmarks_bar(command);
     } else if (*type == "set_website_color_scheme"sv) {
         handle_set_website_color_scheme(command);
     } else if (*type == "set_preferred_contrast"sv) {
@@ -1776,6 +1784,19 @@ void EngineServer::handle_clipboard_changed(JsonObject const& command)
         EngineApplication::the().cache_clipboard_item_from_frontend({});
 }
 
+static StringView bookmarks_bar_to_string(WebView::ShowBookmarksBar value)
+{
+    switch (value) {
+    case WebView::ShowBookmarksBar::Always:
+        return "always"sv;
+    case WebView::ShowBookmarksBar::Never:
+        return "never"sv;
+    case WebView::ShowBookmarksBar::OnHover:
+        return "onHover"sv;
+    }
+    VERIFY_NOT_REACHED();
+}
+
 void EngineServer::send_view_preferences()
 {
     JsonObject event;
@@ -1783,6 +1804,8 @@ void EngineServer::send_view_preferences()
     event.set("color_scheme"sv, website_color_scheme_to_string(WebView::Application::settings().appearance().website_color_scheme));
     event.set("contrast"sv, preferred_contrast_to_string(EngineApplication::the().preferred_contrast()));
     event.set("motion"sv, preferred_motion_to_string(EngineApplication::the().preferred_motion()));
+    event.set("show_bookmarks_bar"sv, bookmarks_bar_to_string(WebView::Application::settings().appearance().show_bookmarks_bar));
+    event.set("restore_previous_session"sv, WebView::Application::settings().restore_previous_session());
     send_event(move(event));
 }
 
@@ -1879,6 +1902,28 @@ void EngineServer::handle_set_navigator_compatibility_mode(JsonObject const& com
     event.set("type"sv, "navigator_compatibility_mode_changed"sv);
     event.set("value"sv, WebView::navigator_compatibility_mode_to_string(*mode));
     send_event(move(event));
+}
+
+void EngineServer::handle_set_show_bookmarks_bar(JsonObject const& command)
+{
+    auto value = command.get_string("value"sv);
+    if (!value.has_value())
+        return;
+
+    WebView::ShowBookmarksBar mode;
+    if (*value == "always"sv)
+        mode = WebView::ShowBookmarksBar::Always;
+    else if (*value == "never"sv)
+        mode = WebView::ShowBookmarksBar::Never;
+    else if (*value == "onHover"sv)
+        mode = WebView::ShowBookmarksBar::OnHover;
+    else
+        return;
+
+    auto appearance = WebView::Application::settings().appearance();
+    appearance.show_bookmarks_bar = mode;
+    WebView::Application::settings().set_appearance(appearance);
+    send_view_preferences();
 }
 
 void EngineServer::handle_set_website_color_scheme(JsonObject const& command)

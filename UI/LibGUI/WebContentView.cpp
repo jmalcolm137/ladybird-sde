@@ -206,6 +206,8 @@ void WebContentView::mouseup_event(GUI::MouseEvent& event)
 void WebContentView::mousemove_event(GUI::MouseEvent& event)
 {
     m_last_mouse_position = event.position();
+    if (on_hover)
+        on_hover();
     if (on_mouse)
         on_mouse("move"sv, event.position(), event.button(), event.buttons(), event.modifiers(), 0);
     event.accept();

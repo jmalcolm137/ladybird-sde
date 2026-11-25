@@ -37,6 +37,7 @@ public:
 
     // Check the View > Color Scheme / Contrast / Motion items that match the session's current choices.
     void update_view_preference_actions();
+    void set_bookmarks_bar_mode(String const& mode);
 
     void reopen_tab(String const& url);
     void open_startup_urls(Vector<String> const& urls);
@@ -162,7 +163,7 @@ private:
     RefPtr<GUI::Action> m_new_private_window_action;
     RefPtr<GUI::Action> m_open_file_action;
     RefPtr<GUI::Action> m_always_on_top_action;
-    RefPtr<GUI::Action> m_bookmarks_bar_action;
+    HashMap<String, RefPtr<GUI::Action>> m_bookmarks_bar_actions;
     RefPtr<GUI::Action> m_close_tab_action;
     RefPtr<GUI::Action> m_reopen_closed_tab_action;
     RefPtr<GUI::Action> m_next_tab_action;
@@ -248,7 +249,7 @@ private:
     bool m_reordering_tabs { false };
     bool m_always_on_top { false };
     HashMap<u64, BrowserTab*> m_pending_session_tab_requests;
-    bool m_show_bookmarks_bar { false };
+    String m_bookmarks_bar_mode { "never"_string };
     RefPtr<Gfx::Bitmap const> m_bookmark_icon;
     RefPtr<Gfx::Bitmap const> m_bookmark_filled_icon;
     RefPtr<Gfx::Bitmap const> m_pinned_tab_icon;
