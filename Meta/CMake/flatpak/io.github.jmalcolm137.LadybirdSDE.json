@@ -64,7 +64,7 @@
                 {
                     "type": "git",
                     "url": "https://github.com/simdutf/simdutf.git",
-                    "tag": "v9.3.3"
+                    "tag": "v9.5.0"
                 }
             ],
             "config-opts": [
@@ -743,6 +743,10 @@
                 {
                     "type": "patch",
                     "path": "../vcpkg/overlay-ports/curl/poll-idle-connection-input.patch"
+                },
+                {
+                    "type": "patch",
+                    "path": "../vcpkg/overlay-ports/curl/wait-for-http2-stream-limit.patch"
                 }
             ],
             "config-opts": [
