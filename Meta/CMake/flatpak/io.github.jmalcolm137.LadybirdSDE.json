@@ -34,7 +34,9 @@
         "/share/aclocal",
         "/share/cmake",
         "/share/doc",
-        "/share/man"
+        "/share/man",
+        "/lib/ladybird/cmake",
+        "/lib/ladybird/pkgconfig"
     ],
     "modules": [
         {
@@ -867,7 +869,8 @@
                 "-DICU_ROOT=/app",
                 "-DLADYBIRD_BUILD_QT_UI=OFF",
                 "-DLADYBIRD_ENABLE_LTO=OFF",
-                "-DENABLE_INSTALL_FREEDESKTOP_FILES=OFF"
+                "-DENABLE_INSTALL_FREEDESKTOP_FILES=OFF",
+                "-DCMAKE_INSTALL_LIBDIR=lib/ladybird"
             ]
         },
         {
