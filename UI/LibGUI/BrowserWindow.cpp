@@ -726,7 +726,9 @@ void BrowserWindow::create_menus()
     auto& help_menu = *m_window->add_menu("&Help"_string);
     help_menu.add_action(*m_crash_reports_action);
     help_menu.add_action(*m_report_website_issue_action);
-    help_menu.add_action(GUI::CommonActions::make_about_action("Ladybird"_string, GUI::Icon::default_icon("app-browser"sv), m_window.ptr()));
+    help_menu.add_action(GUI::Action::create("&About Ladybird SDE"sv, GUI::Icon::default_icon("app-browser"sv).bitmap_for_size(16), [this](auto&) {
+        show_about_dialog();
+    }, m_window.ptr()));
 
     update_view_preference_actions();
 }

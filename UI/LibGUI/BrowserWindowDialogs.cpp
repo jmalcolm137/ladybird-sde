@@ -12,12 +12,15 @@
 #include <AK/StringBuilder.h>
 #include <LibCore/Environment.h>
 #include <LibCore/Timer.h>
+#include <LibCore/Version.h>
+#include <LibGUI/AboutDialog.h>
 #include <LibGUI/BoxLayout.h>
 #include <LibGUI/Button.h>
 #include <LibGUI/CheckBox.h>
 #include <LibGUI/ComboBox.h>
 #include <LibGUI/Dialog.h>
 #include <LibGUI/InputBox.h>
+#include <LibGUI/ImageWidget.h>
 #include <LibGUI/ItemListModel.h>
 #include <LibGUI/JsonArrayModel.h>
 #include <LibGUI/Label.h>
@@ -29,6 +32,24 @@
 #include <LibGUI/Widget.h>
 
 namespace LadybirdSDE {
+void BrowserWindow::show_about_dialog()
+{
+    auto version = Core::Version::read_long_version_string().release_value_but_fixme_should_propagate_errors();
+    auto dialog = GUI::AboutDialog::create("Ladybird SDE"_string, version, GUI::Icon::default_icon("app-browser"sv).bitmap_for_size(32), m_window.ptr());
+
+    // The SDE presents itself as SerenityDE; the stock dialog's resource text
+    // still says SerenityOS. The banner comes from the SDE resource tree, which
+    // the Flatpak installs over the upstream one.
+    auto* widget = dialog->main_widget();
+    if (auto* label = widget->find_descendant_of_type_named<GUI::Label>("serenity_os"sv))
+        label->set_text("SerenityDE"_string);
+    if (auto* copyright = widget->find_descendant_of_type_named<GUI::Label>("copyright"sv))
+        copyright->set_text("Copyright © the Ladybird and SerenityDE developers"_string);
+
+    dialog->exec();
+}
+
+
 
 static String format_memory(u64 bytes)
 {

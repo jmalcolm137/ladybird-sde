@@ -108,6 +108,7 @@ private:
     void navigate_active(String const& url);
     void show_downloads();
     void show_permissions();
+    void show_about_dialog();
     void update_downloads(JsonObject const&);
     void handle_download_event(JsonObject const&);
     void show_tab_context_menu(BrowserTab&, Gfx::IntPoint);

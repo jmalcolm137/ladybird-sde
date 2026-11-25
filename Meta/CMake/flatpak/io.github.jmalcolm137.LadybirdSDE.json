@@ -893,12 +893,22 @@
                     "type": "file",
                     "path": "../../../Base/res/icons/48x48/app-browser.png",
                     "dest-filename": "io.github.jmalcolm137.LadybirdSDE.png"
+                },
+                {
+                    "type": "file",
+                    "path": "sde/brand-banner.png"
+                },
+                {
+                    "type": "file",
+                    "path": "sde/brand-banner-2x.png"
                 }
             ],
             "build-commands": [
                 "install -Dm644 io.github.jmalcolm137.LadybirdSDE.desktop /app/share/applications/io.github.jmalcolm137.LadybirdSDE.desktop",
                 "install -Dm644 io.github.jmalcolm137.LadybirdSDE.metainfo.xml /app/share/metainfo/io.github.jmalcolm137.LadybirdSDE.metainfo.xml",
-                "install -Dm644 io.github.jmalcolm137.LadybirdSDE.png /app/share/icons/hicolor/48x48/apps/io.github.jmalcolm137.LadybirdSDE.png"
+                "install -Dm644 io.github.jmalcolm137.LadybirdSDE.png /app/share/icons/hicolor/48x48/apps/io.github.jmalcolm137.LadybirdSDE.png",
+                "install -Dm644 brand-banner.png /app/share/res/graphics/brand-banner.png",
+                "install -Dm644 brand-banner-2x.png /app/share/res/graphics/brand-banner-2x.png"
             ]
         }
     ]
