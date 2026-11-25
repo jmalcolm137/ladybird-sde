@@ -12,11 +12,17 @@ ROOT := $(abspath $(CURDIR)/../..)
 LIBGUI_WAYLAND_ROOT ?= $(ROOT)/../libgui-wayland
 LAGOM ?= $(abspath $(LIBGUI_WAYLAND_ROOT)/build/lagom)
 SERENITY ?= $(abspath $(LIBGUI_WAYLAND_ROOT)/serenity)
+# Override when the build tree uses lib64, or when linking for an install prefix
+# instead of the build tree.
+LAGOM_LIB ?= $(LAGOM)/lib
+LAGOM_RPATH ?= $(LAGOM_LIB)
 BIN_DIR ?= $(ROOT)/build/chrome
 TARGET := $(BIN_DIR)/Ladybird
 
 CXX ?= c++
-CXXFLAGS ?= -std=c++26 -fno-exceptions -O2 -g -Wall -Wextra -Wno-literal-suffix
+# Append rather than replace: build environments such as flatpak-builder export
+# their own CXXFLAGS, and the standard must survive that.
+CXXFLAGS += -std=c++26 -fno-exceptions -O2 -g -Wall -Wextra -Wno-literal-suffix
 ASAN ?= 0
 ifeq ($(ASAN),1)
 CXXFLAGS += -fsanitize=address,undefined -fno-omit-frame-pointer
@@ -37,7 +43,7 @@ CPPFLAGS += \
 # libwindowserver.so is the in-process WindowServer implementation that turns a
 # LibGUI window into a Wayland toplevel. Its historical name does not mean it is
 # a service to start.
-LDFLAGS += -L$(LAGOM)/lib -Wl,--no-as-needed -Wl,-rpath,$(LAGOM)/lib -Wl,-rpath,'$$ORIGIN/../lib'
+LDFLAGS += -L$(LAGOM_LIB) -Wl,--no-as-needed -Wl,-rpath,'$(LAGOM_RPATH)' -Wl,-rpath,'$$ORIGIN/../lib'
 LDLIBS += \
 	-llagom-gui \
 	-llagom-gfx \
