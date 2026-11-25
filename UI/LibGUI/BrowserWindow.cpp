@@ -697,7 +697,7 @@ void BrowserWindow::create_menus()
 
     auto& tools_menu = *m_window->add_menu("&Tools"_string);
     tools_menu.add_action(GUI::Action::create("&Settings"sv, [this](auto&) {
-        navigate_active("about:settings"_string);
+        add_tab("about:settings"_string, true);
     }, m_window.ptr()));
     tools_menu.add_action(*m_site_info_action);
     tools_menu.add_action(*m_downloads_action);
