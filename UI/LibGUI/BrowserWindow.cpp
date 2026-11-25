@@ -611,7 +611,6 @@ void BrowserWindow::create_menus()
     view_menu.add_action(*m_zoom_out_action);
     view_menu.add_action(*m_reset_zoom_action);
     view_menu.add_separator();
-    view_menu.add_action(*m_find_action);
     view_menu.add_action(*m_focus_location_action);
     view_menu.add_action(*m_fullscreen_action);
     view_menu.add_action(*m_always_on_top_action);
