@@ -26,6 +26,7 @@
 #include <LibGUI/Clipboard.h>
 #include <LibGUI/ComboBox.h>
 #include <LibGUI/Dialog.h>
+#include <LibGUI/FilePicker.h>
 #include <LibGUI/Icon.h>
 #include <LibGUI/InputBox.h>
 #include <LibGUI/ItemListModel.h>
@@ -38,6 +39,7 @@
 #include <LibGUI/TextBox.h>
 #include <LibGUI/Widget.h>
 #include <LibGfx/Bitmap.h>
+#include <LibURL/URL.h>
 #include <LibGfx/Palette.h>
 #include <LibGfx/StylePainter.h>
 
@@ -404,8 +406,11 @@ void BrowserWindow::create_actions()
     }, m_window.ptr());
 
     m_open_file_action = GUI::Action::create("&Open File…"sv, { Mod_Ctrl, Key_O }, [this](auto&) {
-        if (auto* tab = active_tab())
-            tab->open_file();
+        auto path = GUI::FilePicker::get_open_filepath(m_window.ptr(), "Open File"sv, Core::StandardPaths::home_directory());
+        if (!path.has_value())
+            return;
+        auto url = URL::create_with_file_scheme(path.value());
+        add_tab(String::from_byte_string(url.serialize()).release_value(), true);
     }, m_window.ptr());
     m_open_file_action->set_status_tip("Open a file from this computer"_string);
 
