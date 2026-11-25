@@ -11,7 +11,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SOURCES="${FLATPAK_SOURCES:-$ROOT/Meta/CMake/flatpak/sources}"
 LIBGUI_REPO="${LIBGUI_REPO:-https://github.com/jmalcolm137/libgui-wayland.git}"
-LIBGUI_COMMIT="${LIBGUI_COMMIT:-03a39c6b743acd9c6ec9289feb9a18137b51e28f}"
+LIBGUI_COMMIT="${LIBGUI_COMMIT:-4c17310736962d3e3aadf725cf7847961083e0ff}"
 
 LIBGUI_DIR="$SOURCES/libgui-wayland"
 SERENITY_DIR="$LIBGUI_DIR/serenity"
