@@ -20,7 +20,10 @@
         "--filesystem=xdg-download",
         "--filesystem=xdg-config/gtk-3.0:ro",
         "--talk-name=org.freedesktop.portal.Desktop",
-        "--talk-name=org.freedesktop.Notifications"
+        "--talk-name=org.freedesktop.Notifications",
+        "--env=LADYBIRD_ENGINE_HOST=/app/libexec/LadybirdEngine",
+        "--env=LADYBIRD_SOURCE_DIR=/app",
+        "--env=SERENITY_RES_ROOT=/app/share/res"
     ],
     "cleanup": [
         "/sbin",
@@ -804,7 +807,7 @@
                 "cd serenity && git init -q && git add -A && git -c user.name=\"Flatpak Builder\" -c user.email=\"flatpak@localhost\" commit -qm \"SerenityOS snapshot\"",
                 "SERENITY_SRC=\"$PWD/serenity\" BUILD_DIR=\"$PWD/build/lagom\" JOBS=\"$FLATPAK_BUILDER_N_JOBS\" ./scripts/build-libgui.sh --no-tests",
                 "LAGOM_LIBDIR=\"$PWD/build/lagom/lib64\"; [ -d \"$LAGOM_LIBDIR\" ] || LAGOM_LIBDIR=\"$PWD/build/lagom/lib\"; make -C ladybird/UI/LibGUI -j\"$FLATPAK_BUILDER_N_JOBS\" LIBGUI_WAYLAND_ROOT=\"$PWD\" LAGOM=\"$PWD/build/lagom\" LAGOM_LIB=\"$LAGOM_LIBDIR\" SERENITY=\"$PWD/serenity\" BIN_DIR=\"$PWD/frontend\" LAGOM_RPATH='$$ORIGIN/../lib'",
-                "install -Dm755 frontend/Ladybird /app/bin/LadybirdSDE.real",
+                "install -Dm755 frontend/Ladybird /app/bin/LadybirdSDE",
                 "install -d /app/lib /app/share/res",
                 "LAGOM_LIBDIR=\"$PWD/build/lagom/lib64\"; [ -d \"$LAGOM_LIBDIR\" ] || LAGOM_LIBDIR=\"$PWD/build/lagom/lib\"; cp -a \"$LAGOM_LIBDIR\"/liblagom-*.so* \"$LAGOM_LIBDIR\"/libwm.so* \"$LAGOM_LIBDIR\"/libwindowserver.so* /app/lib/",
                 "cp -a serenity/Base/res/. /app/share/res/"
@@ -873,10 +876,6 @@
             "sources": [
                 {
                     "type": "file",
-                    "path": "sde/LadybirdSDE"
-                },
-                {
-                    "type": "file",
                     "path": "sde/io.github.jmalcolm137.LadybirdSDE.desktop"
                 },
                 {
@@ -890,7 +889,6 @@
                 }
             ],
             "build-commands": [
-                "install -Dm755 LadybirdSDE /app/bin/LadybirdSDE",
                 "install -Dm644 io.github.jmalcolm137.LadybirdSDE.desktop /app/share/applications/io.github.jmalcolm137.LadybirdSDE.desktop",
                 "install -Dm644 io.github.jmalcolm137.LadybirdSDE.metainfo.xml /app/share/metainfo/io.github.jmalcolm137.LadybirdSDE.metainfo.xml",
                 "install -Dm644 io.github.jmalcolm137.LadybirdSDE.png /app/share/icons/hicolor/48x48/apps/io.github.jmalcolm137.LadybirdSDE.png"
