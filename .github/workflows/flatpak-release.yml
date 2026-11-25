@@ -28,10 +28,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  flatpak:
+  build:
     name: Build x86_64 bundle
     runs-on: ubuntu-24.04
     timeout-minutes: 350
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:kde-6.10
+      options: --privileged
     env:
       APP_ID: io.github.jmalcolm137.LadybirdSDE
       BUNDLE: LadybirdSDE-${{ inputs.version }}-x86_64.flatpak
@@ -42,23 +45,14 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
-      - name: Free disk space
+      # The image bakes a Flatpak installation into a read-only layer. Copy it to
+      # the writable layer so updates can rename deployments (the upstream build
+      # does the same).
+      - name: Make the baked-in Flatpak installation writable
         run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
-            /opt/hostedtoolcache/CodeQL /usr/local/share/boost
-          sudo apt-get clean
-          df -h /
-
-      - name: Install Flatpak tooling
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder elfutils
-          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-          flatpak install --user -y --noninteractive flathub \
-            org.freedesktop.Platform//26.08 \
-            org.freedesktop.Sdk//26.08 \
-            org.freedesktop.Sdk.Extension.llvm22//26.08 \
-            org.freedesktop.Sdk.Extension.rust-stable//26.08
+          cp -a /var/lib/flatpak /var/lib/flatpak.rw
+          rm -rf /var/lib/flatpak
+          mv /var/lib/flatpak.rw /var/lib/flatpak
 
       - name: Fetch pinned sources
         run: ./scripts/fetch-flatpak-sources.sh
@@ -68,8 +62,10 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: |
           python3 - <<'PY'
+          import datetime
           import json
           import os
+          import re
 
           version = os.environ['VERSION']
 
@@ -85,46 +81,58 @@ jobs:
           path = 'Meta/CMake/flatpak/sde/io.github.jmalcolm137.LadybirdSDE.metainfo.xml'
           with open(path) as file:
               metainfo = file.read()
-          import re
           metainfo = re.sub(
               r'<release version="[^"]*" date="[^"]*"/>',
-              f'<release version="{version}" date="{__import__("datetime").date.today().isoformat()}"/>',
+              f'<release version="{version}" date="{datetime.date.today().isoformat()}"/>',
               metainfo,
           )
           with open(path, 'w') as file:
               file.write(metainfo)
           PY
 
-      - name: Build
-        run: |
-          flatpak-builder --user --force-clean --disable-rofiles-fuse \
-            --install-deps-from=flathub \
-            --repo=build/flatpak-repo --default-branch=stable \
-            build/flatpak-build "$MANIFEST"
+      - name: Build bundle
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: ${{ env.BUNDLE }}
+          manifest-path: ${{ env.MANIFEST }}
+          arch: x86_64
+          branch: stable
+          cache: false
+          upload-artifact: false
 
-      - name: Bundle
-        run: |
-          flatpak build-bundle \
-            --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo \
-            build/flatpak-repo "$BUNDLE" "$APP_ID" stable
-          sha256sum "$BUNDLE" > "$BUNDLE.sha256"
-          ls -lh "$BUNDLE"
+      - name: Checksum
+        run: sha256sum "$BUNDLE" > "$BUNDLE.sha256"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ env.BUNDLE }}
+          name: LadybirdSDE-x86_64
           path: |
             ${{ env.BUNDLE }}
             ${{ env.BUNDLE }}.sha256
           if-no-files-found: error
 
-      - name: Publish release
-        if: ${{ inputs.publish }}
+  publish:
+    name: Publish release
+    if: ${{ inputs.publish }}
+    needs: build
+    runs-on: ubuntu-24.04
+    env:
+      APP_ID: io.github.jmalcolm137.LadybirdSDE
+      BUNDLE: LadybirdSDE-${{ inputs.version }}-x86_64.flatpak
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: LadybirdSDE-x86_64
+          path: dist
+
+      - name: Create or update release
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ inputs.version }}
         run: |
+          cd dist
           tag="sde-$VERSION"
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" "$BUNDLE" "$BUNDLE.sha256" --clobber
