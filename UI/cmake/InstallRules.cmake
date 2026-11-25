@@ -12,7 +12,16 @@ else()
     set(ladybird_helper_install_dir ${CMAKE_INSTALL_LIBEXECDIR})
 endif()
 
-set(ladybird_applications ladybird WebDriver ${ladybird_helper_processes})
+set(ladybird_applications ${ladybird_helper_processes})
+if (TARGET ladybird)
+    list(APPEND ladybird_applications ladybird)
+endif()
+if (TARGET WebDriver)
+    list(APPEND ladybird_applications WebDriver)
+endif()
+if (TARGET LadybirdEngine)
+    list(APPEND ladybird_applications LadybirdEngine)
+endif()
 
 # Builds with vcpkg ship the shared libraries it built, which are found by what the installed binaries link.
 include(install_vcpkg_libraries)
@@ -33,24 +42,54 @@ if (NOT MSVC)
             COMPONENT ladybird_Runtime)
 endif()
 
-install(TARGETS ladybird WebDriver
-  EXPORT ladybirdTargets
-  ${vcpkg_runtime_dependencies}
-  RUNTIME
-    COMPONENT ladybird_Runtime
-    DESTINATION ${ladybird_executable_install_dir}
-  BUNDLE
-    COMPONENT ladybird_Runtime
-    DESTINATION bundle
-  LIBRARY
-    COMPONENT ladybird_Runtime
-    NAMELINK_COMPONENT ladybird_Development
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  FILE_SET browser
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-  FILE_SET ladybird
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-)
+if (TARGET ladybird)
+    install(TARGETS ladybird
+      EXPORT ladybirdTargets
+      ${vcpkg_runtime_dependencies}
+      RUNTIME
+        COMPONENT ladybird_Runtime
+        DESTINATION ${ladybird_executable_install_dir}
+      BUNDLE
+        COMPONENT ladybird_Runtime
+        DESTINATION bundle
+      LIBRARY
+        COMPONENT ladybird_Runtime
+        NAMELINK_COMPONENT ladybird_Development
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}
+      FILE_SET browser
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+      FILE_SET ladybird
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
+endif()
+
+if (TARGET WebDriver)
+    install(TARGETS WebDriver
+      EXPORT ladybirdTargets
+      ${vcpkg_runtime_dependencies}
+      RUNTIME
+        COMPONENT ladybird_Runtime
+        DESTINATION ${ladybird_executable_install_dir}
+      BUNDLE
+        COMPONENT ladybird_Runtime
+        DESTINATION bundle
+      LIBRARY
+        COMPONENT ladybird_Runtime
+        NAMELINK_COMPONENT ladybird_Development
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    )
+endif()
+
+# When the Qt UI is disabled there is no ladybird target to carry the vcpkg
+# runtime dependency set, so collect it from the engine host instead.
+if (NOT TARGET ladybird AND TARGET LadybirdEngine AND vcpkg_runtime_dependencies)
+    install(TARGETS LadybirdEngine
+      RUNTIME_DEPENDENCY_SET ladybird_vcpkg_libraries
+      RUNTIME
+        COMPONENT ladybird_Runtime
+        DESTINATION ${ladybird_helper_install_dir}
+    )
+endif()
 
 install(TARGETS ${ladybird_helper_processes}
   EXPORT ladybirdTargets
@@ -70,7 +109,7 @@ list(REMOVE_DUPLICATES all_required_lagom_libraries)
 # Remove ladybird shlib if it exists
 list(REMOVE_ITEM all_required_lagom_libraries ladybird)
 
-if (APPLE)
+if (APPLE AND TARGET ladybird)
     # Fixup the app bundle and copy:
     #   - Shared libraries from lib/ to Ladybird.app/Contents/lib
     # Static libraries are linked into the executables, so nothing loads them from the bundle.

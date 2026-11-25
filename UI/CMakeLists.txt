@@ -151,41 +151,49 @@ function(create_ladybird_bundle target_name)
     copy_resources_to_build(${resource_base_dir} ${target_name})
 endfunction()
 
-add_subdirectory("Qt")
+if (LADYBIRD_BUILD_QT_UI)
+    add_subdirectory("Qt")
+
+    if (NOT TARGET ladybird)
+        message(FATAL_ERROR "UI Framework selection must declare a ladybird target")
+    endif()
+elseif (LINUX AND NOT ANDROID AND NOT VCPKG_TARGET_ANDROID)
+    # The engine host is the only UI target in this configuration. Give it the
+    # same resource target the Qt frontend would have declared.
+    copy_resources_to_build("${CMAKE_BINARY_DIR}/${IN_BUILD_PREFIX}${CMAKE_INSTALL_DATADIR}/Lagom" ladybird)
+endif()
 
 # The LibGUI port's headless Ladybird process. It is an alternative UI-process
 # backend, not part of Ladybird's own Qt UI, so it needs the resource and helper
-# targets the Qt frontend just declared.
+# targets declared above.
 if (LINUX AND NOT ANDROID AND NOT VCPKG_TARGET_ANDROID)
     add_subdirectory("LadybirdEngine")
 endif()
 
-if (NOT TARGET ladybird)
-    message(FATAL_ERROR "UI Framework selection must declare a ladybird target")
-endif()
-
 if (TARGET ladybird_impl)
     set(LADYBIRD_TARGET ladybird_impl PUBLIC)
-else()
+elseif (TARGET ladybird)
     set(LADYBIRD_TARGET ladybird PRIVATE)
 endif()
 
-set(LADYBIRD_LIBS AK LibCore LibGfx LibIPC LibMain LibThreading LibWebView LibURL LibWakeLock LibGamepad hubipc)
-# NB: Where the Hub is a process of its own, the UI must not be able to reach into it.
-if (LINUX OR APPLE)
-    target_compile_definitions(${LADYBIRD_TARGET} LADYBIRD_HUB_IN_OWN_PROCESS)
-else()
-    list(APPEND LADYBIRD_LIBS hubservice)
-endif()
-target_link_libraries(${LADYBIRD_TARGET} ${LADYBIRD_LIBS})
-target_link_libraries(${LADYBIRD_TARGET} OpenSSL::Crypto OpenSSL::SSL)
+if (DEFINED LADYBIRD_TARGET)
+    set(LADYBIRD_LIBS AK LibCore LibGfx LibIPC LibMain LibThreading LibWebView LibURL LibWakeLock LibGamepad hubipc)
+    # NB: Where the Hub is a process of its own, the UI must not be able to reach into it.
+    if (LINUX OR APPLE)
+        target_compile_definitions(${LADYBIRD_TARGET} LADYBIRD_HUB_IN_OWN_PROCESS)
+    else()
+        list(APPEND LADYBIRD_LIBS hubservice)
+    endif()
+    target_link_libraries(${LADYBIRD_TARGET} ${LADYBIRD_LIBS})
+    target_link_libraries(${LADYBIRD_TARGET} OpenSSL::Crypto OpenSSL::SSL)
 
-target_include_directories(${LADYBIRD_TARGET} ${CMAKE_CURRENT_BINARY_DIR})
-target_include_directories(${LADYBIRD_TARGET} ${LADYBIRD_SOURCE_DIR})
-target_include_directories(${LADYBIRD_TARGET} ${LADYBIRD_SOURCE_DIR}/Services/)
+    target_include_directories(${LADYBIRD_TARGET} ${CMAKE_CURRENT_BINARY_DIR})
+    target_include_directories(${LADYBIRD_TARGET} ${LADYBIRD_SOURCE_DIR})
+    target_include_directories(${LADYBIRD_TARGET} ${LADYBIRD_SOURCE_DIR}/Services/)
 
-if(WIN32)
-    target_link_libraries(${LADYBIRD_TARGET} LibDevTools)
+    if(WIN32)
+        target_link_libraries(${LADYBIRD_TARGET} LibDevTools)
+    endif()
 endif()
 
 function(set_helper_process_properties)
@@ -198,32 +206,34 @@ function(set_helper_process_properties)
     endif()
 endfunction()
 
-add_custom_target(run
-    COMMAND "${CMAKE_COMMAND}" -E env "LADYBIRD_SOURCE_DIR=${LADYBIRD_SOURCE_DIR}" "$<TARGET_FILE:ladybird>" $ENV{LAGOM_ARGS}
-    USES_TERMINAL
-    VERBATIM
-)
-
-if (APPLE)
-    add_custom_target(debug-ladybird
-        COMMAND "${CMAKE_COMMAND}" -E env "LADYBIRD_SOURCE_DIR=${LADYBIRD_SOURCE_DIR}" lldb "$<TARGET_BUNDLE_DIR:ladybird>"
+if (TARGET ladybird)
+    add_custom_target(run
+        COMMAND "${CMAKE_COMMAND}" -E env "LADYBIRD_SOURCE_DIR=${LADYBIRD_SOURCE_DIR}" "$<TARGET_FILE:ladybird>" $ENV{LAGOM_ARGS}
         USES_TERMINAL
+        VERBATIM
     )
-else()
-    add_custom_target(debug-ladybird
-        COMMAND "${CMAKE_COMMAND}" -E env "LADYBIRD_SOURCE_DIR=${LADYBIRD_SOURCE_DIR}" gdb "$<TARGET_FILE:ladybird>"
-        USES_TERMINAL
-    )
-endif()
 
-add_dependencies(ladybird ${ladybird_helper_processes})
-# FIXME: Increase support for building targets on Windows
-if (NOT WIN32)
-    add_dependencies(WebDriver ladybird)
+    if (APPLE)
+        add_custom_target(debug-ladybird
+            COMMAND "${CMAKE_COMMAND}" -E env "LADYBIRD_SOURCE_DIR=${LADYBIRD_SOURCE_DIR}" lldb "$<TARGET_BUNDLE_DIR:ladybird>"
+            USES_TERMINAL
+        )
+    else()
+        add_custom_target(debug-ladybird
+            COMMAND "${CMAKE_COMMAND}" -E env "LADYBIRD_SOURCE_DIR=${LADYBIRD_SOURCE_DIR}" gdb "$<TARGET_FILE:ladybird>"
+            USES_TERMINAL
+        )
+    endif()
+
+    add_dependencies(ladybird ${ladybird_helper_processes})
+    # FIXME: Increase support for building targets on Windows
+    if (NOT WIN32 AND TARGET WebDriver)
+        add_dependencies(WebDriver ladybird)
+    endif()
 endif()
 
 set_helper_process_properties(${ladybird_helper_processes})
-if (APPLE)
+if (APPLE AND TARGET ladybird)
     set_helper_process_properties(WebDriver)
 
     # WebDriver and the helpers can link into the bundle after ladybird has signed it — and that leaves the seal stale

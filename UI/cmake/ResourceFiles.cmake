@@ -166,7 +166,11 @@ function(copy_resources_to_build base_directory bundle_target)
     copy_resource_set(ladybird RESOURCES "${LADYBIRD_LICENSES_FILE}"
         DESTINATION ${base_directory} TARGET ${bundle_target}
     )
-    add_dependencies(${bundle_target} generate_licenses)
+    if (TARGET ${bundle_target})
+        add_dependencies(${bundle_target} generate_licenses)
+    else()
+        add_dependencies("${bundle_target}_build_resource_files" generate_licenses)
+    endif()
 
     copy_resource_set(ladybird/about-pages RESOURCES ${ABOUT_PAGES}
         DESTINATION ${base_directory} TARGET ${bundle_target}
@@ -201,7 +205,9 @@ function(copy_resources_to_build base_directory bundle_target)
         )
     endif()
 
-    add_dependencies(${bundle_target} "${bundle_target}_build_resource_files")
+    if (TARGET ${bundle_target})
+        add_dependencies(${bundle_target} "${bundle_target}_build_resource_files")
+    endif()
 endfunction()
 
 function(install_ladybird_resources destination component)
