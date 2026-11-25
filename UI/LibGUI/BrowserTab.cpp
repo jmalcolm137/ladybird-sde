@@ -61,6 +61,22 @@ private:
     }
 };
 
+class TopChromeWidget final : public GUI::Widget {
+    C_OBJECT(TopChromeWidget);
+
+public:
+    Function<void()> on_hover;
+    virtual ~TopChromeWidget() override = default;
+
+private:
+    virtual void mousemove_event(GUI::MouseEvent& event) override
+    {
+        if (on_hover)
+            on_hover();
+        GUI::Widget::mousemove_event(event);
+    }
+};
+
 // The chrome icons follow the drawings the Qt frontend uses for its tab list and
 // site indicator, scaled onto the same 16 px canvas.
 enum class ChromeGlyph {
@@ -175,7 +191,7 @@ static SiteIdentity site_identity_for_url(String const& url)
 BrowserTab::BrowserTab(EngineClient& engine, GUI::Window& window, GUI::Action& back_action, GUI::Action& forward_action, GUI::Action& reload_action, GUI::Action& stop_action, GUI::Action& bookmark_action, GUI::Action& home_action, GUI::Action& new_tab_action, GUI::Action& downloads_action)
     : m_engine(engine)
     , m_root(GUI::Widget::construct())
-    , m_top_chrome(GUI::Widget::construct())
+    , m_top_chrome(TopChromeWidget::construct())
 {
     m_title = "New Tab"_string;
 
@@ -183,6 +199,7 @@ BrowserTab::BrowserTab(EngineClient& engine, GUI::Window& window, GUI::Action& b
     m_top_chrome->set_fill_with_background_color(true);
     m_top_chrome->set_layout<GUI::VerticalBoxLayout>(GUI::Margins { 0 }, 0);
     m_top_chrome->set_preferred_height(GUI::SpecialDimension::Fit);
+    static_cast<TopChromeWidget&>(*m_top_chrome).on_hover = [this] { set_bookmarks_bar_hovered(true); };
 
     auto& toolbar_container = m_top_chrome->add<GUI::ToolbarContainer>();
     m_toolbar = toolbar_container.add<GUI::Toolbar>();
@@ -441,9 +458,14 @@ BrowserTab::BrowserTab(EngineClient& engine, GUI::Window& window, GUI::Action& b
 
 
     m_web_view = m_root->add<WebContentView>();
+    m_web_view->on_hover = [this] { set_bookmarks_bar_hovered(false); };
     m_web_view->set_preferred_size(GUI::SpecialDimension::Grow, GUI::SpecialDimension::Grow);
 
     m_statusbar = m_root->add<GUI::Statusbar>();
+    // The in-process WindowServer does not implement the corner's interactive
+    // resize, so showing its resize cursor would promise something that does
+    // not work. Use the compositor's server-side decoration edges instead.
+    m_statusbar->set_corner_visible(false);
     m_statusbar->set_fixed_height(22);
     m_statusbar->set_text(String {});
 
@@ -747,7 +769,7 @@ void BrowserTab::set_bookmarks(Vector<BookmarkEntry> const& bookmarks)
     }
 
     m_has_bookmarks = !bookmarks.is_empty();
-    m_bookmarks_bar->set_visible(m_bookmarks_bar_visible && m_has_bookmarks);
+    refresh_bookmarks_bar_visibility();
     m_top_chrome->invalidate_layout();
     if (auto* parent = m_top_chrome->parent_widget())
         parent->invalidate_layout();
@@ -758,10 +780,27 @@ void BrowserTab::set_bookmarks(Vector<BookmarkEntry> const& bookmarks)
     }
 }
 
-void BrowserTab::set_bookmarks_bar_visible(bool visible)
+void BrowserTab::set_bookmarks_bar_mode(String const& mode)
 {
-    m_bookmarks_bar_visible = visible;
-    m_bookmarks_bar->set_visible(visible && m_has_bookmarks);
+    m_bookmarks_bar_mode = mode;
+    refresh_bookmarks_bar_visibility();
+}
+
+void BrowserTab::set_bookmarks_bar_hovered(bool hovered)
+{
+    if (m_bookmarks_bar_hovered == hovered)
+        return;
+    m_bookmarks_bar_hovered = hovered;
+    refresh_bookmarks_bar_visibility();
+}
+
+void BrowserTab::refresh_bookmarks_bar_visibility()
+{
+    bool visible = m_has_bookmarks
+        && (m_bookmarks_bar_mode == "always" || (m_bookmarks_bar_mode == "onHover" && m_bookmarks_bar_hovered));
+    if (m_bookmarks_bar->is_visible() == visible)
+        return;
+    m_bookmarks_bar->set_visible(visible);
     m_top_chrome->invalidate_layout();
     if (auto* parent = m_top_chrome->parent_widget())
         parent->invalidate_layout();
@@ -1342,9 +1381,10 @@ void BrowserTab::show_context_menu(JsonArray const& items, Gfx::IntPoint view_po
     auto menu = GUI::Menu::construct("Context Menu"_string);
     add_context_menu_items(*menu, items);
 
-    auto root_origin = m_root->screen_relative_rect().location();
-    auto view_origin = m_web_view->screen_relative_rect().location();
-    auto popup_position = view_origin.translated(-root_origin.x(), -root_origin.y()).translated(view_position.x(), view_position.y());
+    // Menu positions are in screen coordinates; the event position is relative to
+    // the rendered page. Subtracting the window origin here offset the menu by the
+    // window's own position.
+    auto popup_position = m_web_view->screen_relative_rect().location().translated(view_position.x(), view_position.y());
 
     m_context_menu = menu;
     m_context_menu->popup(popup_position);
@@ -1505,9 +1545,8 @@ void BrowserTab::show_select_dropdown(Gfx::IntPoint position, i32 minimum_width,
     };
 
     m_select_dropdown = menu;
-    auto root_origin = m_root->screen_relative_rect().location();
-    auto view_origin = m_web_view->screen_relative_rect().location();
-    auto popup_position = view_origin.translated(-root_origin.x(), -root_origin.y()).translated(position.x(), position.y());
+    // Screen coordinates, like every other Menu::popup() caller.
+    auto popup_position = m_web_view->screen_relative_rect().location().translated(position.x(), position.y());
     m_select_dropdown->popup(popup_position);
 }
 
