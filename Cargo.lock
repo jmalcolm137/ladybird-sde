@@ -1877,6 +1877,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "libdns_rust"
+version = "0.1.0"
+dependencies = [
+ "ak",
+ "cbindgen",
+ "ladybird_allocator",
+ "libcrypto_rust",
+ "rustc-demangle",
+]
+
+[[package]]
 name = "libgc_rust"
 version = "0.1.0"
 dependencies = [
@@ -2096,6 +2107,7 @@ dependencies = [
  "cbindgen",
  "cc",
  "flapc",
+ "getrandom 0.4.2",
  "ladybird_allocator",
  "libc",
  "libwasm_jit",
@@ -2139,6 +2151,7 @@ dependencies = [
  "libunicode_rust",
  "liburl_rust",
  "libwasm_engine",
+ "libweb_html_tokenizer",
  "libweb_rust",
  "libwebcommon_rust",
  "rustc-demangle",
