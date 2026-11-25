@@ -684,7 +684,7 @@ void BrowserWindow::create_menus()
     bookmarks_menu.add_action(GUI::Action::create("&Manage Bookmarks…"sv, [this](auto&) {
         show_bookmarks_manager();
     }, m_window.ptr()));
-    bookmarks_menu.add_action(GUI::Action::create("Show &Bookmarks"sv, [this](auto&) {
+    bookmarks_menu.add_action(GUI::Action::create("View &Bookmarks"sv, [this](auto&) {
         navigate_active("about:bookmarks"_string);
     }, m_window.ptr()));
     bookmarks_menu.add_separator();
