@@ -247,7 +247,7 @@ private:
     bool m_reordering_tabs { false };
     bool m_always_on_top { false };
     HashMap<u64, BrowserTab*> m_pending_session_tab_requests;
-    bool m_show_bookmarks_bar { true };
+    bool m_show_bookmarks_bar { false };
     RefPtr<Gfx::Bitmap const> m_bookmark_icon;
     RefPtr<Gfx::Bitmap const> m_bookmark_filled_icon;
     RefPtr<Gfx::Bitmap const> m_pinned_tab_icon;

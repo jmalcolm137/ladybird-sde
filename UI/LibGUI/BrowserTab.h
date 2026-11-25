@@ -242,7 +242,7 @@ private:
     bool m_can_go_back { false };
     bool m_can_go_forward { false };
     bool m_bookmarked { false };
-    bool m_bookmarks_bar_visible { true };
+    bool m_bookmarks_bar_visible { false };
     bool m_has_bookmarks { false };
     bool m_private { false };
 };

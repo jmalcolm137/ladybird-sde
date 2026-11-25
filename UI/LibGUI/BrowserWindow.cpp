@@ -422,7 +422,7 @@ void BrowserWindow::create_actions()
         for (auto& tab : m_tabs)
             tab->set_bookmarks_bar_visible(m_show_bookmarks_bar);
     }, m_window.ptr());
-    m_bookmarks_bar_action->set_checked(true);
+    m_bookmarks_bar_action->set_checked(false);
 
     m_close_tab_action = GUI::Action::create("&Close Tab"sv, { Mod_Ctrl, Key_W }, close_tab_icon, [this](auto&) {
         if (auto* tab = active_tab())
