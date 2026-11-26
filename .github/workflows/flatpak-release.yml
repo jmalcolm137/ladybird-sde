@@ -120,6 +120,9 @@ jobs:
     env:
       APP_ID: io.github.jmalcolm137.LadybirdSDE
       BUNDLE: LadybirdSDE-${{ inputs.version }}-x86_64.flatpak
+      # The publish job has no checkout, so `gh` cannot derive the repository
+      # from a git remote; point it at this repository explicitly.
+      GH_REPO: ${{ github.repository }}
     steps:
       - name: Download artifact
         uses: actions/download-artifact@v8
