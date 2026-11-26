@@ -21,7 +21,7 @@ use super::wire::{
 use super::{
     BandOfPlan, BarrierCut, BarrierOfPlan, CutOfPlan, LayerIndex, LayerStack, LayeredPlan, LayeringObstacles,
     MAXIMUM_LAYER_COUNT_OF_LIVE_CONTENT_DRAWN_BY_ITS_RECORD, MAXIMUM_NESTING_OF_COMPOSITED_EFFECTS, NodeOfPlan,
-    PlacementNodeIndex, WhyCompositorCannotCompositeEffect, WhyListIsOneLayer, media_name,
+    PlacementNodeIndex, StackOnWire, WhyCompositorCannotCompositeEffect, WhyListIsOneLayer, media_name,
 };
 use crate::display_list::animated_transform_spaces::{effect_reads_below_it, spatial_nodes_under_transform_animations};
 use crate::display_list::builder::{bounding_rect_computed_from_payload, record_can_paint_within};
@@ -180,19 +180,22 @@ struct BackdropReaderAnAnimationMayCut {
     read_tiles: Reach<IntRect>,
 }
 
-/// A plan of the layers of a list: the stack the compositor composites frames from, and where the parts of the list
-/// are placed among the spaces of the stack, which only the dump, the overlay of layers and the tests read.
+/// A plan of the layers of a list: the stack the compositor composites frames from, what of the stack a plan carries
+/// to the compositor, and where the parts of the list are placed among the spaces of the stack, which only the dump,
+/// the overlay of layers and the tests read.
 #[derive(Clone, Debug, PartialEq)]
 pub struct PlannedLayers {
     pub stack: LayerStack,
+    pub stack_on_wire: StackOnWire,
     pub placement: ListPlacement,
 }
 
 /// What a plan of the layers of a list reads, all of which WebContent publishes.
 pub struct LayerStackInputs<'a> {
     pub list: &'a DisplayListStorage,
-    /// The tree as WebContent published it, without the samples of the compositor's animations and without a visual
-    /// viewport transform of the compositor's.
+    /// The tree as WebContent published it, without the samples of the compositor's animations, with its visual
+    /// viewport at identity: plans are made in the device pixels of the layout viewport and hold wherever the visual
+    /// viewport is.
     pub tree: &'a VisualContextTree,
     /// The scroll offsets WebContent published with the tree. A plan reads only those that
     /// `RasterSpaceAnchorsOfTree::leaves_out_scroll_offset_of_node` does not name.
@@ -2689,6 +2692,7 @@ fn build_layer_stack(
         &layering_obstacles,
     )
     .and_then(|plan| {
+        let stack_on_wire = StackOnWire::Layered(plan.clone());
         LayerStack::of_plan_passing_checks(
             plan,
             spaces,
@@ -2698,6 +2702,7 @@ fn build_layer_stack(
             layering_obstacles,
             nesting_of_live_effects,
         )
+        .map(|stack| (stack, stack_on_wire))
         .map_err(|why_plan_fails_checks| {
             debug_assert!(
                 false,
@@ -2710,7 +2715,11 @@ fn build_layer_stack(
         })
     });
     match stack_of_plan {
-        Ok(stack) => PlannedLayers { stack, placement },
+        Ok((stack, stack_on_wire)) => PlannedLayers {
+            stack,
+            stack_on_wire,
+            placement,
+        },
         Err(why_list_is_one_layer) => one_layer(inputs, why_list_is_one_layer, layering_obstacles, placement),
     }
 }
@@ -2728,6 +2737,7 @@ fn one_layer(
             Some(why_list_is_one_layer),
             layering_obstacles,
         ),
+        stack_on_wire: StackOnWire::OneLayer(why_list_is_one_layer),
         placement,
     }
 }
@@ -2856,6 +2866,7 @@ impl InputsOfLayerPlan {
         scroll_offsets: &[FloatPoint],
         viewport_rect: IntRect,
     ) -> Self {
+        let tree = VisualContextTree::tree_of_layer_plans_for(&tree, earlier.map(|earlier| &earlier.tree));
         let anchors_of_tree = match earlier {
             Some(earlier) if Arc::ptr_eq(&earlier.tree, &tree) => earlier.anchors_of_tree.clone(),
             _ => Arc::new(RasterSpaceAnchorsOfTree::of(&tree)),
@@ -4622,6 +4633,55 @@ mod tests {
                 ..
             }
         ));
+    }
+
+    #[test]
+    fn a_stack_at_a_power_of_two_of_its_raster_scale_cuts_each_tile_as_the_plan_cuts_the_cell_around_it() {
+        use crate::display_list::tiles::TileCoord;
+        let (tree, _, document) = tree_with_document_scroll();
+        let stack = ListOfOneChunk::default()
+            .with(fill(IntRect::new(0, 0, 800, 2600), GREEN), document)
+            .with(canvas(IntRect::new(500, 490, 100, 40), 1), document)
+            .with(fill(IntRect::new(400, 400, 400, 400), GREEN), document)
+            .stack(&tree, &[]);
+        let band_with_cut = stack
+            .bands
+            .iter()
+            .position(|band| !band.cuts.is_empty())
+            .expect("the canvas cuts a band");
+        let mut scroll_offsets = vec![FloatPoint::default(); tree.spatial_nodes.len()];
+        scroll_offsets[document.spatial.0 as usize] = FloatPoint { x: 0.0, y: 100.0 };
+        let composite_offsets_of_plan = stack.composite_offsets(&scroll_offsets);
+        for factor in [2, 4] {
+            let stack_at_scale = stack.at_raster_scale(factor);
+            let tiles = CellRange::touched_by(IntRect::new(0, 0, 1024 * 2 * factor, 512 * 3 * factor));
+            for coord in tiles.coords() {
+                let cell_of_plan =
+                    TileCoord::new(coord.column.div_euclid(factor), coord.row.div_euclid(factor)).cell_rect();
+                let layers_above_cuts = |stack: &LayerStack, cell: IntRect| -> Vec<LayerIndex> {
+                    CutsOfCell::of(&stack.bands[band_with_cut], cell)
+                        .cuts()
+                        .map(|cut| cut.layer_above_cut)
+                        .collect()
+                };
+                assert_eq!(
+                    layers_above_cuts(&stack_at_scale, coord.cell_rect()),
+                    layers_above_cuts(&stack, cell_of_plan),
+                    "tile {coord} at {factor} raster pixels per device pixel"
+                );
+            }
+            let composite_offsets_at_scale: Vec<libgfx_rust::IntPoint> = composite_offsets_of_plan
+                .iter()
+                .map(|offset| libgfx_rust::IntPoint {
+                    x: offset.x * factor,
+                    y: offset.y * factor,
+                })
+                .collect();
+            assert_eq!(
+                stack_at_scale.composite_offsets(&scroll_offsets),
+                composite_offsets_at_scale
+            );
+        }
     }
 
     #[test]

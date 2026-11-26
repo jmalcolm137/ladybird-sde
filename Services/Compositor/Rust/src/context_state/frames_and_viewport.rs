@@ -88,13 +88,21 @@ impl ContextState {
         )
     }
 
-    pub fn set_scroll_capabilities(&mut self, capabilities: &ScrollCapabilities) {
+    pub fn set_scroll_capabilities(&mut self, capabilities: &ScrollCapabilities, now: MonotonicTime) -> bool {
         self.presentation_synthesizes_scroll_momentum = capabilities.synthesizes_scroll_momentum;
         self.elastic_overscroll_controller
             .set_enabled(capabilities.scrolls_elastically);
         self.scrollbar_track_press_jumps = capabilities.scrollbar_track_press_jumps;
         self.wheel_gesture_routing
             .set_touchpad_gesture_end(capabilities.touchpad_gesture_end);
+
+        let visibility_changed = self
+            .scrollbar_controller
+            .set_scrollbars_always_shown(capabilities.scrollbars_always_shown, now);
+        if visibility_changed {
+            self.update_scrollbar_visibility(now);
+        }
+        visibility_changed
     }
 
     pub fn advance_elastic_overscroll_rebounds(&mut self, frame_time: MonotonicTime) -> Option<IntRect> {
@@ -301,9 +309,12 @@ impl ContextState {
             self.device_pixel_ratio,
             &self.host.overlay_label_shaper(self.context_id),
         );
+        let raster = self.scene.raster_of_frame(self.viewport_rect());
         FrameInputs {
-            visual_context_tree: self.scene.visual_context_tree_for_compositing().clone(),
-            layer_plan: self.scene.layer_plan_unless_visual_viewport_differs().cloned(),
+            visual_context_tree: raster.visual_context_tree,
+            raster_to_frame: raster.raster_to_frame,
+            layer_plan: raster.layer_plan,
+            raster_scale: raster.raster_scale,
             presented_scroll_state_snapshot,
             scrollbars,
             painted_at: now,

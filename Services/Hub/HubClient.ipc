@@ -134,6 +134,7 @@ struct Hub::UIInfo {
     bool reports_scroll_momentum;
     bool scrolls_elastically;
     bool scrollbar_track_press_jumps;
+    bool scrollbars_always_shown;
     bool prefers_reduced_motion;
     bool prefers_more_contrast;
     Vector<String> preferred_languages;
@@ -185,23 +186,11 @@ struct WebView::ContextMenuRequest {
 }
 
 [ExistingCpp]
-struct WebView::LocalFileRoot {
-    ByteString path;
-    WebView::LocalFileRoot::Scope scope;
-}
-
-[ExistingCpp]
-struct WebView::DocumentStateLocalFileRoot {
-    Web::HTML::CrossProcessId document_state_id;
-    WebView::LocalFileRoot root;
-}
-
-[ExistingCpp]
 struct WebView::SessionHistorySnapshot {
     Vector<Web::HTML::SessionHistoryEntryDescriptor> entries;
     Vector<i32> used_steps;
     size_t current_used_step_index;
-    Vector<WebView::DocumentStateLocalFileRoot> local_file_roots_of_document_states;
+    Vector<Web::HTML::CrossProcessId> document_states_holding_local_file_content;
 }
 
 // A language the tab's page can be translated into, perhaps after a download.

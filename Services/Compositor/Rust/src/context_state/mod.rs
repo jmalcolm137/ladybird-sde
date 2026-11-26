@@ -180,6 +180,7 @@ pub struct ScrollCapabilities {
     pub synthesizes_scroll_momentum: bool,
     pub scrolls_elastically: bool,
     pub scrollbar_track_press_jumps: bool,
+    pub scrollbars_always_shown: bool,
     pub touchpad_gesture_end: TouchpadGestureEnd,
 }
 
@@ -189,6 +190,7 @@ impl Default for ScrollCapabilities {
             synthesizes_scroll_momentum: false,
             scrolls_elastically: false,
             scrollbar_track_press_jumps: false,
+            scrollbars_always_shown: false,
             touchpad_gesture_end: TouchpadGestureEnd::AfterIdleDelay,
         }
     }
@@ -339,6 +341,9 @@ pub struct ContextState {
 // INTEROP: Holding a press beside the thumb pages again after these delays, as in Chromium and Firefox.
 const SCROLLBAR_PAGING_INITIAL_DELAY: Duration = Duration::from_milliseconds(250);
 const SCROLLBAR_PAGING_REPEAT_INTERVAL: Duration = Duration::from_milliseconds(50);
+
+// After this long without a step of a pinch, frames raster at the scale for the zoom at rest.
+const ZOOM_SETTLES_AFTER: Duration = Duration::from_milliseconds(150);
 
 // INTEROP: The modifier that makes a press beside the thumb page instead of jumping there or the other way around, as in
 //          Chromium and Firefox.
@@ -634,6 +639,7 @@ impl ContextState {
                 self.scrollbar_paging_timer_is_armed = true;
             }
             ContextTimer::ScrollbarFadeOut => self.request_display_ticks_if_needed(now),
+            ContextTimer::RasterScaleOfZoomSettles => return self.scene.settle_raster_scale(),
             ContextTimer::CaretBlink => {
                 self.schedule_next_caret_blink(now);
                 // The frame finds what the blink changes in the content hashes of what draws each caret.
