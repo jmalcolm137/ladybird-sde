@@ -6,7 +6,14 @@
 
 #include "EngineApplication.h"
 
+#include <AK/Base64.h>
+#include <AK/JsonArray.h>
+#include <AK/JsonObject.h>
 #include <AK/LexicalPath.h>
+#include <AK/NeverDestroyed.h>
+#include <LibURL/Parser.h>
+#include <LibWebView/WebUI.h>
+#include <LibWebView/WebUI/ApplicationWebUI.h>
 #include <LibCore/ArgsParser.h>
 #include <LibCore/Environment.h>
 #include <LibCore/EventLoop.h>
@@ -24,7 +31,123 @@
 
 namespace LadybirdSDE {
 
-EngineApplication::EngineApplication() = default;
+static HashMap<u64, bool>& history_page_is_private()
+{
+    static NeverDestroyed<HashMap<u64, bool>> pages;
+    return *pages;
+}
+
+static Optional<String> history_site_key_for_entry(WebView::HistoryEntry const& entry)
+{
+    auto parsed_url = URL::Parser::basic_parse(entry.url);
+    if (!parsed_url.has_value() || !parsed_url->host().has_value() || parsed_url->host()->is_empty_host())
+        return {};
+    if (auto registrable_domain = parsed_url->host()->registrable_domain(); registrable_domain.has_value())
+        return registrable_domain.release_value();
+    return MUST(String::from_utf8(parsed_url->serialized_host()));
+}
+
+static JsonObject serialize_history_entry(WebView::HistoryEntry const& entry)
+{
+    String favicon_base64_png;
+    if (entry.favicon_png.has_value()) {
+        if (auto encoded = encode_base64(entry.favicon_png->bytes()); !encoded.is_error())
+            favicon_base64_png = encoded.release_value();
+    }
+
+    JsonObject serialized;
+    serialized.set("url"sv, entry.url);
+    serialized.set("title"sv, entry.title.value_or(String {}));
+    serialized.set("faviconBase64Png"sv, move(favicon_base64_png));
+    serialized.set("visitCount"sv, entry.visit_count);
+    serialized.set("lastVisitedTime"sv, entry.last_visited_time.milliseconds_since_epoch());
+    serialized.set("siteKey"sv, history_site_key_for_entry(entry).value_or(String {}));
+    return serialized;
+}
+
+static void send_history_entries(u64 page_id, JsonValue const& data)
+{
+    auto* page = WebView::ApplicationWebUI::find(page_id);
+    if (!page || !data.is_object())
+        return;
+
+    auto const& object = data.as_object();
+    auto offset = object.get_integer<size_t>("offset"sv).value_or(0);
+    auto limit = object.get_integer<size_t>("limit"sv).value_or(50);
+    auto request_id = object.get_integer<i64>("requestId"sv).value_or(0);
+    auto query = object.get_string("query"sv).value_or(String {});
+
+    limit = min(limit, static_cast<size_t>(100));
+    bool is_private = history_page_is_private().get(page_id).value_or(false);
+
+    Vector<WebView::HistoryEntry> entries;
+    if (!is_private)
+        entries = EngineApplication::the().history_store().list_entries(query, offset, limit + 1);
+    bool has_more = entries.size() > limit;
+    if (has_more)
+        entries.resize(limit);
+
+    JsonArray serialized_entries;
+    for (auto const& entry : entries)
+        serialized_entries.must_append(serialize_history_entry(entry));
+
+    JsonObject result;
+    result.set("requestId"sv, request_id);
+    result.set("query"sv, query);
+    result.set("offset"sv, offset);
+    result.set("hasMore"sv, has_more);
+    result.set("entries"sv, move(serialized_entries));
+    page->send_to_page("loadHistoryEntries"_string, move(result));
+}
+
+static void remove_history_entry(u64 page_id, JsonValue const& data)
+{
+    if (history_page_is_private().get(page_id).value_or(false) || !data.is_object())
+        return;
+    auto url = data.as_object().get_string("url"sv);
+    if (!url.has_value())
+        return;
+    auto parsed_url = URL::Parser::basic_parse(*url);
+    if (!parsed_url.has_value())
+        return;
+    auto engagements = EngineApplication::the().bookmark_store().is_bookmarked(*parsed_url)
+        ? WebView::RemoveHistoryEntryEngagements::No
+        : WebView::RemoveHistoryEntryEngagements::Yes;
+    EngineApplication::the().history_store().remove_entry_for_url(*parsed_url, engagements);
+}
+
+static void forget_history_site(u64 page_id, JsonValue const& data)
+{
+    if (history_page_is_private().get(page_id).value_or(false) || !data.is_object())
+        return;
+    auto url = data.as_object().get_string("url"sv);
+    if (!url.has_value())
+        return;
+    auto parsed_url = URL::Parser::basic_parse(*url);
+    if (parsed_url.has_value())
+        EngineApplication::the().history_store().remove_entries_for_same_site(*parsed_url);
+}
+
+EngineApplication::EngineApplication()
+{
+    WebView::WebUI::add_application_page("history"_string, "History"_string);
+    WebView::ApplicationWebUI::set_callbacks({
+        .on_open = [](u64 page_id, String const&, WebView::IsPrivate is_private) {
+            history_page_is_private().set(page_id, is_private == WebView::IsPrivate::Yes);
+        },
+        .on_message = [](u64 page_id, String name, JsonValue data) {
+            if (name == "loadHistoryEntries"sv)
+                send_history_entries(page_id, data);
+            else if (name == "removeHistoryEntry"sv)
+                remove_history_entry(page_id, data);
+            else if (name == "forgetHistorySite"sv)
+                forget_history_site(page_id, data);
+        },
+        .on_close = [](u64 page_id) {
+            history_page_is_private().remove(page_id);
+        },
+    });
+}
 EngineApplication::~EngineApplication() = default;
 
 Ladybird::BookmarkStore& EngineApplication::bookmark_store()

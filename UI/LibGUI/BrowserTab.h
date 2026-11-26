@@ -88,6 +88,7 @@ public:
 
     void navigate(String const& url);
     void open_file();
+    void view_source();
     void reload();
     void stop();
     void go_back();

@@ -43,6 +43,7 @@ public:
     void close_tab(u64 tab_id);
     void activate_tab(u64 tab_id, u64 window_id = 0);
     void navigate(u64 tab_id, String const& url, bool user_input = true);
+    void view_source(u64 tab_id);
     void autocomplete(u64 tab_id, u64 request_id, String const& query);
     void go_back(u64 tab_id);
     void go_forward(u64 tab_id);

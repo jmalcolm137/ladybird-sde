@@ -647,6 +647,14 @@ void EngineClient::close_tab(u64 tab_id)
     send_simple("close_tab"sv, tab_id);
 }
 
+void EngineClient::view_source(u64 tab_id)
+{
+    JsonObject event;
+    event.set("type"sv, "view_source"sv);
+    event.set("tab"sv, tab_id);
+    send(event);
+}
+
 void EngineClient::navigate(u64 tab_id, String const& url, bool user_input)
 {
     JsonObject event;

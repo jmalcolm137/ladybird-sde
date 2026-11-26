@@ -167,33 +167,44 @@ void BrowserWindow::show_user_agent_dialog()
     auto& description = main_widget->add<GUI::Label>("Choose a preset or enter a custom User-Agent string."_string);
     description.set_text_wrapping(Gfx::TextWrapping::Wrap);
 
-    Vector<String> names;
-    for (auto const& preset : m_session.user_agent_presets())
-        names.append(preset.name);
-    names.append("Custom…"_string);
-
-    auto& preset_combo = main_widget->add<GUI::ComboBox>();
-    preset_combo.set_model(GUI::ItemListModel<String>::create(names));
-    preset_combo.set_only_allow_values_from_model(true);
-
     auto& user_agent_box = main_widget->add<GUI::TextBox>();
     user_agent_box.set_fixed_height(26);
     user_agent_box.set_text(m_session.current_user_agent().bytes_as_string_view());
 
-    size_t selected_index = names.size() - 1;
+    auto& preset_button = main_widget->add<GUI::Button>("Preset: Custom…"_string);
+    preset_button.set_fixed_height(26);
+
+    auto preset_menu = GUI::Menu::construct("User Agent Presets"_string);
+    auto select_preset = [&](String const& name, String const& value) {
+        user_agent_box.set_text(value.bytes_as_string_view());
+        preset_button.set_text(String::formatted("Preset: {}", name).release_value());
+    };
+    for (auto const& preset : m_session.user_agent_presets()) {
+        auto name = preset.name;
+        auto value = preset.value;
+        preset_menu->add_action(GUI::Action::create(name.to_byte_string(), [&, name, value](auto&) {
+            select_preset(name, value);
+        }));
+    }
+    preset_menu->add_separator();
+    preset_menu->add_action(GUI::Action::create("Custom…", [&](auto&) {
+        preset_button.set_text("Preset: Custom…"_string);
+        user_agent_box.set_focus(true);
+    }));
+
+    preset_button.on_click = [&preset_button, menu = move(preset_menu)](auto) {
+        menu->popup(preset_button.screen_relative_rect().bottom_left(), {}, preset_button.rect());
+    };
+
+    size_t selected_index = m_session.user_agent_presets().size();
     for (size_t index = 0; index < m_session.user_agent_presets().size(); ++index) {
         if (m_session.user_agent_presets()[index].value == m_session.current_user_agent()) {
             selected_index = index;
             break;
         }
     }
-    preset_combo.set_selected_index(selected_index);
-
-    preset_combo.on_change = [&](ByteString const&, GUI::ModelIndex const& index) {
-        if (!index.is_valid() || index.row() >= static_cast<int>(m_session.user_agent_presets().size()))
-            return;
-        user_agent_box.set_text(m_session.user_agent_presets()[index.row()].value.bytes_as_string_view());
-    };
+    if (selected_index < m_session.user_agent_presets().size())
+        preset_button.set_text(String::formatted("Preset: {}", m_session.user_agent_presets()[selected_index].name).release_value());
 
     auto& buttons = main_widget->add<GUI::Widget>();
     buttons.set_layout<GUI::HorizontalBoxLayout>();

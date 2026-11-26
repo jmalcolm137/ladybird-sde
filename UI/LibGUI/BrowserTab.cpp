@@ -639,6 +639,12 @@ void BrowserTab::open_file()
     navigate(String::from_byte_string(url.serialize()).release_value());
 }
 
+void BrowserTab::view_source()
+{
+    if (is_attached())
+        m_engine.view_source(m_tab_id);
+}
+
 void BrowserTab::reload()
 {
     if (is_attached())

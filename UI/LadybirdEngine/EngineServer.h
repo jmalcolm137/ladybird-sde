@@ -204,6 +204,7 @@ private:
     void handle_file_picker_response(u64 tab_id, JsonObject const&);
     void handle_select_dropdown_closed(u64 tab_id, JsonObject const&);
     void handle_download_action(JsonObject const&);
+    void handle_view_source(u64 tab_id);
     void handle_history_recent(JsonObject const&);
     void handle_history_search(JsonObject const&);
     void handle_history_clear();

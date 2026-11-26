@@ -109,6 +109,18 @@ protected:
         if (on_session_history_change)
             on_session_history_change(history, url);
     }
+
+    virtual void did_visit_page(URL::URL const& url, Optional<String> const& title, WebView::HistoryVisitTransition transition) override
+    {
+        if (is_private() == WebView::IsPrivate::No)
+            EngineApplication::the().history_store().record_visit(url, title, UnixDateTime::now(), transition);
+    }
+
+    virtual void did_change_visited_page_title(URL::URL const& url, String const& title) override
+    {
+        if (is_private() == WebView::IsPrivate::No)
+            EngineApplication::the().history_store().update_title(url, title);
+    }
 };
 
 EngineServer::EngineServer(NonnullOwnPtr<Core::LocalSocket> socket, ByteString frame_directory, Core::AnonymousBuffer theme)
@@ -1538,6 +1550,12 @@ static Optional<Web::Clipboard::SystemClipboardItem> clipboard_item_from_json(Js
     if (representations.is_empty())
         return {};
     return Web::Clipboard::SystemClipboardItem { move(representations) };
+}
+
+void EngineServer::handle_view_source(u64 tab_id)
+{
+    if (auto* tab = tab_for_id(tab_id))
+        tab->view->get_source();
 }
 
 void EngineServer::handle_history_recent(JsonObject const& command)
