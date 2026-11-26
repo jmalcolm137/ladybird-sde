@@ -525,7 +525,7 @@ void BrowserWindow::create_actions()
 
     m_view_source_action = GUI::Action::create("View &Source"sv, { Mod_Ctrl, Key_U }, [this](auto&) {
         if (auto* tab = active_tab(); tab && !tab->current_url().is_empty())
-            navigate_active(String::formatted("view-source:{}", tab->current_url()).release_value());
+            tab->view_source();
     }, m_window.ptr());
     m_view_source_action->set_status_tip("View the source of the current page"_string);
 

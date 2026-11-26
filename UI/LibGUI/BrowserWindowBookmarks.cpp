@@ -103,7 +103,7 @@ void BrowserWindow::rebuild_history_menu()
             m_engine->clear_history();
     }));
     m_history_menu->add_action(GUI::Action::create("Show &History"sv, [this](auto&) {
-        navigate_active("about:history"_string);
+        add_tab("about:history"_string, true);
     }));
 
 }
