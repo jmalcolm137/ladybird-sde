@@ -564,6 +564,8 @@ void EngineServer::dispatch_command(JsonObject const& command)
             handle_activate_tab(*tab_id, command);
         } else if (*type == "navigate"sv) {
             handle_navigate(*tab_id, command);
+        } else if (*type == "view_source"sv) {
+            handle_view_source(*tab_id);
         } else if (*type == "autocomplete"sv) {
             handle_autocomplete(*tab_id, command);
         } else if (*type == "back"sv) {
