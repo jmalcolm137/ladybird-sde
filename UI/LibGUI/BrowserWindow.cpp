@@ -316,10 +316,10 @@ ErrorOr<void> BrowserWindow::initialize(Vector<InitialTab> initial_tabs, Optiona
             close_tab(*tab);
     };
     m_tab_widget->on_context_menu_request = [this](GUI::Widget& widget, GUI::ContextMenuEvent const& event) {
-        if (auto* tab = tab_for_widget(widget)) {
-            auto origin = m_tab_widget->screen_relative_rect().location();
-            show_tab_context_menu(*tab, event.screen_position().translated(-origin.x(), -origin.y()));
-        }
+        // Menu::popup() takes screen coordinates; passing the tab widget's local
+        // point here placed the tab menu off screen by the window origin.
+        if (auto* tab = tab_for_widget(widget))
+            show_tab_context_menu(*tab, event.screen_position());
     };
 
     m_window->on_close_request = [this] {
