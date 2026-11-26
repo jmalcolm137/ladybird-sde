@@ -2410,8 +2410,11 @@ void EngineServer::send_context_menu(Tab& tab, WebView::ContextMenuRequest reque
             add("Open Link in New Tab"_string, on_tab([navigation](Tab& tab) {
                 tab.view->open_url_in_new_tab(navigation.url, Web::HTML::ActivateTab::No);
             }));
+            add("Open Link in New Window"_string, on_tab([navigation](Tab& tab) {
+                tab.view->open_url_in_new_window(navigation.url, WebView::IsPrivate::No);
+            }));
             add_separator();
-            add("Copy Link Address"_string, [copy_text, url = navigation.url.to_string()] { copy_text(url); });
+            add("Copy URL"_string, [copy_text, url = navigation.url.to_string()] { copy_text(url); });
             add("Download Linked File"_string, on_tab([navigation](Tab& tab) {
                 tab.view->download_url(navigation.url, WebView::ViewImplementation::PromptForPath::Yes);
             }));
