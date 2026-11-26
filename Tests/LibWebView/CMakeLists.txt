@@ -94,6 +94,7 @@ set(TEST_SOURCES
     TestPictureInPictureWindow.cpp
     TestPlatformFeatures.cpp
     TestProfile.cpp
+    TestRecentLossCounter.cpp
     TestScrollbarSettings.cpp
     TestSessionHistory.cpp
     TestSessionHistoryTraversalQueue.cpp
@@ -162,6 +163,7 @@ if (NOT WIN32)
         TestFavicon.cpp
         TestFileDownloader.cpp
         TestFocusWithoutSystemFocus.cpp
+        TestFormValidationMessage.cpp
         TestGamepadExposure.cpp
         TestImageDecoderIsolation.cpp
         TestInputMethodState.cpp
