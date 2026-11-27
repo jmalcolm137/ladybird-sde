@@ -83,6 +83,10 @@ public:
     void create_engine_tab(u64 request_id, String const& url, bool private_tab = false);
     void set_initial_url(String const& url) { m_initial_url = url; }
     String const& initial_url() const { return m_initial_url; }
+    // A navigation the user requested before the engine had a tab for this
+    // view. It is sent as soon as the tab attaches.
+    bool has_pending_navigation() const { return !m_pending_navigation.is_empty(); }
+    String const& pending_navigation() const { return m_pending_navigation; }
     void attach_tab_id(u64 tab_id);
     void detach();
 
@@ -241,6 +245,8 @@ private:
     u64 m_session_window_id { 0 };
     u64 m_request_id { 0 };
     String m_initial_url;
+    String m_pending_navigation;
+    String m_requested_url;
     String m_title;
     bool m_loading { false };
     bool m_can_go_back { false };

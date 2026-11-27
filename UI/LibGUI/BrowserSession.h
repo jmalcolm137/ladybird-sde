@@ -117,6 +117,10 @@ private:
     BrowserWindow* active_window() const;
 
     void on_engine_connected();
+    // Attach the tabs once the engine's launch plan has been applied (or was
+    // abandoned because it did not arrive in time).
+    void finish_pending_restore();
+    void remove_provisional_window(BrowserWindow&);
     void on_engine_event(JsonObject const&);
     void handle_session_plan(JsonObject const&);
     void on_engine_frame(u64 tab_id, Gfx::Bitmap const*, u64 sequence, Gfx::IntRect damage, bool full);
@@ -152,6 +156,7 @@ private:
     RefPtr<Core::Timer> m_autosave_timer;
     RefPtr<Core::Timer> m_session_plan_timeout;
     bool m_waiting_for_session_plan { false };
+    bool m_restore_pending { false };
     bool m_session_plan_received { false };
     Vector<String> m_pending_initial_urls;
     Optional<u16> m_devtools_port;

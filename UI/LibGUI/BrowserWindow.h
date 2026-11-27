@@ -40,14 +40,23 @@ public:
     void set_bookmarks_bar_mode(String const& mode);
 
     void reopen_tab(String const& url);
-    void open_startup_urls(Vector<String> const& urls);
+    void open_startup_urls(Vector<String> const& urls, bool lazy_load = false);
 
     bool has_tab(u64 tab_id) const;
     bool has_request(u64 request_id) const;
     void adopt_engine_tab(u64 tab_id, u64 request_id);
     void handle_engine_tab_event(JsonObject const&, u64 tab_id);
     void handle_engine_global_event(JsonObject const&);
-    void handle_engine_connected();
+    // attach_tabs is false while the session's launch plan is still pending: the
+    // restored tabs replace this window's provisional ones, and attaching them
+    // first would register duplicate engine tabs.
+    void handle_engine_connected(bool attach_tabs = true);
+    // True while this window is the placeholder shown before the engine's launch
+    // plan arrives: one tab that never reached the engine and has no pending
+    // navigation.
+    bool tabs_are_provisional() const;
+    // Replace the placeholder tabs with the restored ones, keeping the window.
+    void apply_restored_tabs(Vector<InitialTab> const& tabs, Optional<size_t> active_tab);
     void handle_engine_disconnected();
     void handle_engine_frame(u64 tab_id, Gfx::Bitmap const*, u64 sequence, Gfx::IntRect damage, bool full);
     void close_engine_tabs();

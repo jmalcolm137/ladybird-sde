@@ -838,12 +838,14 @@ void BrowserWindow::reopen_tab(String const& url)
     add_tab(url, true);
 }
 
-void BrowserWindow::open_startup_urls(Vector<String> const& urls)
+void BrowserWindow::open_startup_urls(Vector<String> const& urls, bool lazy_load)
 {
     // The reference frontend opens URLs passed on the command line in the
-    // restored window, as tabs after the restored ones.
+    // restored window, as tabs after the restored ones. A lazy load keeps
+    // restored tabs from all fetching at once, and leaves the tab the user was
+    // already using in front.
     for (size_t i = 0; i < urls.size(); ++i)
-        add_tab(urls[i], i == 0);
+        add_tab(urls[i], i == 0 && !lazy_load, true, lazy_load && i != 0);
 }
 
 BrowserTab& BrowserWindow::add_tab(String const& url, bool activate, bool request_engine_tab, bool lazy, u64 session_tab_id)
@@ -1140,16 +1142,41 @@ void BrowserWindow::navigate_active(String const& url)
         tab->navigate(url);
 }
 
-void BrowserWindow::handle_engine_connected()
+void BrowserWindow::handle_engine_connected(bool attach_tabs)
 {
     if (m_engine)
         m_engine->request_history(10);
+    if (!attach_tabs)
+        return;
     for (auto& tab : m_tabs) {
-        if (!tab->is_attached() && !tab->is_lazy()) {
+        // A tab created while the engine was still starting has no engine tab
+        // yet; one that already asked for it (the engine may just not have
+        // answered) must not ask again, or the engine registers it twice.
+        if (!tab->is_attached() && !tab->is_lazy() && !tab->engine_tab_requested()) {
             tab->create_engine_tab(m_session.next_request_id(), tab->initial_url(), m_private);
             tab->set_status(""sv);
         }
     }
+}
+
+bool BrowserWindow::tabs_are_provisional() const
+{
+    if (m_tabs.size() != 1)
+        return false;
+    auto const& tab = *m_tabs[0];
+    return !tab.is_attached() && !tab.engine_tab_requested() && !tab.has_pending_navigation();
+}
+
+void BrowserWindow::apply_restored_tabs(Vector<InitialTab> const& tabs, Optional<size_t> active_tab)
+{
+    Vector<BrowserTab*> existing;
+    existing.ensure_capacity(m_tabs.size());
+    for (auto& tab : m_tabs)
+        existing.append(tab.ptr());
+    for (auto* tab : existing)
+        remove_tab(*tab);
+
+    create_initial_tabs(tabs, active_tab, true);
 }
 
 void BrowserWindow::ensure_tab_loaded(BrowserTab& tab)
@@ -1535,8 +1562,12 @@ void BrowserWindow::set_maximized(bool maximized)
 
 void BrowserWindow::activate_tab_index(size_t index)
 {
-    if (index < m_tabs.size())
-        m_tab_widget->set_active_widget(m_tabs[index]->root().ptr());
+    if (index >= m_tabs.size())
+        return;
+    m_tab_widget->set_active_widget(m_tabs[index]->root().ptr());
+    // set_active_widget() does not synchronize the chrome by itself; do it so
+    // the location bar and window title follow the tab that is now in front.
+    activate_tab(*m_tabs[index]);
 }
 
 void BrowserWindow::handle_download_event(JsonObject const& event)

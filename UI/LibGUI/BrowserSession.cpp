@@ -172,18 +172,25 @@ ErrorOr<void> BrowserSession::initialize(Vector<String> initial_urls, bool priva
         load_permissions();
 
     if (!private_window && should_restore_session() && !Core::Environment::has("LADYBIRD_SDE_DISABLE_SESSION_RESTORE"sv)) {
-        // The engine host owns the native session store and sends its launch plan once connected. Wait for it so
-        // restored tabs and their history are registered under the same session IDs. URLs passed on the command
-        // line open in the restored window, as in the reference frontend.
-        m_pending_initial_urls = move(initial_urls);
+        // The engine host owns the native session store and sends its launch plan
+        // once connected, so restored tabs and their history are registered under
+        // the same session IDs. The engine can take seconds to get there (a cold
+        // start, a loaded machine), and a windowless wait freezes the browser:
+        // show a usable window now, and swap the restored tabs in when the plan
+        // arrives. A window the user has already navigated in is kept as-is.
+        m_pending_initial_urls = initial_urls;
+        m_restore_pending = true;
         m_waiting_for_session_plan = true;
+        if (!create_window_internal(initial_urls, false))
+            return Error::from_string_literal("Unable to create the browser window");
         m_session_plan_timeout = Core::Timer::create_single_shot(10000, [this] {
             if (m_session_plan_received)
                 return;
+            // The plan never arrived: keep what the window has and let the tabs
+            // attach, so the browser is fully usable even without session
+            // restore.
             m_session_plan_received = true;
-            m_waiting_for_session_plan = false;
-            if (m_windows.is_empty())
-                create_window_internal(move(m_pending_initial_urls), false);
+            finish_pending_restore();
         });
         m_session_plan_timeout->start();
     } else {
@@ -213,13 +220,26 @@ void BrowserSession::handle_session_plan(JsonObject const& event)
         // Migration path for sessions written before the engine host used the
         // native SessionStore. Once those tabs are open they are registered
         // with the native store, and later launches use session_plan. Do not
-        // resurrect an old URL-only session when the user passed URLs.
-        if (m_windows.is_empty() && m_pending_initial_urls.is_empty() && load_session())
-            return;
-        if (m_windows.is_empty())
-            create_window_internal(move(m_pending_initial_urls), false);
+        // resurrect an old URL-only session when the user passed URLs, and do
+        // not replace a placeholder the user has already used.
+        if (m_windows.size() == 1 && m_windows[0]->tabs_are_provisional() && m_pending_initial_urls.is_empty()) {
+            auto* provisional = m_windows[0].ptr();
+            if (load_session()) {
+                remove_provisional_window(*provisional);
+                finish_pending_restore();
+                return;
+            }
+        }
+        finish_pending_restore();
         return;
     }
+
+    // The placeholder window shown while the engine was starting takes the first
+    // plan window's tabs, so the user keeps the window they were already using.
+    BrowserWindow* provisional = nullptr;
+    if (m_windows.size() == 1 && m_windows[0]->tabs_are_provisional())
+        provisional = m_windows[0].ptr();
+    bool first_plan_window = true;
 
     for (auto const& value : windows->values()) {
         if (!value.is_object())
@@ -240,16 +260,47 @@ void BrowserSession::handle_session_plan(JsonObject const& event)
             }
         }
 
-        auto session_window_id = object.get_u64("window"sv).value_or(0);
-        auto window = make<BrowserWindow>(*this, *m_engine, m_next_window_id++, false, session_window_id);
         auto active_tab = object.get_u64("active"sv);
-        if (auto result = window->initialize(move(tabs), active_tab.has_value() ? Optional<size_t> { static_cast<size_t>(*active_tab) } : Optional<size_t> {}, true); result.is_error()) {
-            warnln("Ladybird: could not restore a browser window: {}", result.error());
-            continue;
+        auto active_index = active_tab.has_value() ? Optional<size_t> { static_cast<size_t>(*active_tab) } : Optional<size_t> {};
+        auto session_window_id = object.get_u64("window"sv).value_or(0);
+
+        BrowserWindow* window_pointer = nullptr;
+            if (first_plan_window && provisional) {
+            // Reuse the placeholder: replace its tabs with the restored ones.
+            window_pointer = provisional;
+            provisional = nullptr;
+            window_pointer->set_session_window_id(session_window_id);
+            window_pointer->apply_restored_tabs(tabs, active_index);
+        } else if (first_plan_window) {
+            // The user already navigated in the placeholder window (or opened
+            // more tabs): keep it and add the restored pages as extra tabs,
+            // leaving the tab the user was using active.
+            window_pointer = m_windows.is_empty() ? nullptr : m_windows.first().ptr();
+            if (window_pointer) {
+                auto active_index_before = window_pointer->active_tab_index();
+                Vector<String> urls;
+                for (auto const& tab : tabs)
+                    urls.append(tab.url);
+                window_pointer->open_startup_urls(urls, true);
+                // Restored tabs arrive lazy, and the tab the user was using stays
+                // in front.
+                window_pointer->activate_tab_index(active_index_before);
+            }
         }
 
-        auto* window_pointer = window.ptr();
-        m_windows.append(move(window));
+        if (!window_pointer) {
+            auto window = make<BrowserWindow>(*this, *m_engine, m_next_window_id++, false, session_window_id);
+            if (auto result = window->initialize(move(tabs), active_index, true); result.is_error()) {
+                warnln("Ladybird: could not restore a browser window: {}", result.error());
+                first_plan_window = false;
+                continue;
+            }
+            window_pointer = window.ptr();
+            m_windows.append(move(window));
+            window_pointer->show();
+        }
+
+        first_plan_window = false;
 
         if (auto width = object.get_i64("width"sv); width.has_value()) {
             if (auto height = object.get_i64("height"sv); height.has_value() && *width > 0 && *height > 0)
@@ -259,18 +310,14 @@ void BrowserSession::handle_session_plan(JsonObject const& event)
             if (auto y = object.get_i64("y"sv); y.has_value())
                 window_pointer->set_window_position({ static_cast<int>(*x), static_cast<int>(*y) });
         }
-        window_pointer->show();
         if (object.get_bool("maximized"sv).value_or(false))
             window_pointer->set_maximized(true);
     }
 
-    if (m_windows.is_empty()) {
-        create_window_internal(move(m_pending_initial_urls), false);
-        return;
-    }
-
     if (!m_pending_initial_urls.is_empty() && !m_windows.is_empty())
         m_windows.last()->open_startup_urls(m_pending_initial_urls);
+
+    finish_pending_restore();
 }
 
 void BrowserSession::show()
@@ -431,9 +478,31 @@ BrowserWindow* BrowserSession::window_for_request(u64 request_id)
 
 void BrowserSession::on_engine_connected()
 {
+    // While the launch plan is pending the restored tabs will replace the
+    // placeholder ones; attaching them first would create duplicate engine tabs.
+    auto attach_tabs = !m_restore_pending;
+    for (auto& window : m_windows)
+        window->handle_engine_connected(attach_tabs);
+    m_clipboard->send_current_clipboard();
+}
+
+void BrowserSession::finish_pending_restore()
+{
+    m_restore_pending = false;
+    m_waiting_for_session_plan = false;
+    if (m_session_plan_timeout)
+        m_session_plan_timeout->stop();
     for (auto& window : m_windows)
         window->handle_engine_connected();
-    m_clipboard->send_current_clipboard();
+}
+
+void BrowserSession::remove_provisional_window(BrowserWindow& window)
+{
+    if (m_active_window == &window)
+        m_active_window = nullptr;
+    m_windows.remove_first_matching([&](auto& candidate) {
+        return candidate.ptr() == &window;
+    });
 }
 
 void BrowserSession::toggle_devtools()

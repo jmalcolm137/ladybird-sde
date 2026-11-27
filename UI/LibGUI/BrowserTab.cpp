@@ -598,6 +598,7 @@ void BrowserTab::create_engine_tab(u64 request_id, String const& url, bool priva
 {
     m_request_id = request_id;
     m_initial_url = url;
+    m_requested_url = url;
     m_private = private_tab;
     m_engine_tab_requested = true;
     m_engine.create_tab(device_pixel_content_size(), url, request_id, private_tab, m_window_id, m_session_tab_id, m_session_window_id, device_pixel_ratio());
@@ -611,6 +612,17 @@ void BrowserTab::attach_tab_id(u64 tab_id)
     m_engine.activate_tab(tab_id, m_window_id);
     m_engine.resize(tab_id, device_pixel_content_size());
     m_engine.set_focus(tab_id, m_web_view->is_focused());
+
+    // The user typed this URL while the engine was starting (or restoring). The
+    // tab was created before it could be sent, so load it now. When the engine
+    // tab was created with the same URL it is already loading; do not reload.
+    if (has_pending_navigation()) {
+        if (m_pending_navigation != m_requested_url)
+            m_engine.navigate(tab_id, m_pending_navigation, true);
+        if (Core::Environment::has("LADYBIRD_SDE_TEST_LOG_NAVIGATION"sv))
+            warnln("navigation sent: {}", m_pending_navigation);
+        m_pending_navigation = {};
+    }
 }
 
 void BrowserTab::detach()
@@ -625,8 +637,23 @@ void BrowserTab::navigate(String const& url)
     m_inline_base_query = url;
     m_last_location_text = url;
     hide_autocomplete();
-    if (is_attached())
+
+    if (is_attached()) {
         m_engine.navigate(m_tab_id, url, true);
+        return;
+    }
+
+    // The engine is still starting (or the tab is waiting to be registered).
+    // Keep the URL so the tab loads it as soon as it attaches instead of
+    // silently dropping the user's navigation.
+    m_pending_navigation = url;
+    m_initial_url = url;
+    m_lazy = false;
+    set_title(url);
+    if (!m_engine.is_connected())
+        set_status("Starting the Ladybird engine..."sv);
+    if (Core::Environment::has("LADYBIRD_SDE_TEST_LOG_NAVIGATION"sv))
+        warnln("navigation queued: {}", url);
 }
 
 void BrowserTab::open_file()
