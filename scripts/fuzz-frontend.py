@@ -583,7 +583,7 @@ def escape_keypresses(socket_name, runtime, stop, duration):
         "WAYLAND_DISPLAY": socket_name,
         "XDG_RUNTIME_DIR": os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"),
         "SDE_STATE_DIR": os.path.join(runtime, "state"),
-        "SDE_WM_PORTAL_PATH": os.path.join(runtime, "wm"),
+        "LIBWM_WM_PORTAL_PATH": os.path.join(runtime, "wm"),
         "SERENITY_RES_ROOT": SERENITY_RES,
         "LD_LIBRARY_PATH": os.path.join(LAGOM, "lib"),
     })
@@ -637,7 +637,7 @@ def click_at(socket_name, runtime, x, y):
         "WAYLAND_DISPLAY": socket_name,
         "XDG_RUNTIME_DIR": os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"),
         "SDE_STATE_DIR": os.path.join(runtime, "state"),
-        "SDE_WM_PORTAL_PATH": os.path.join(runtime, "wm"),
+        "LIBWM_WM_PORTAL_PATH": os.path.join(runtime, "wm"),
         "SERENITY_RES_ROOT": SERENITY_RES,
         "LD_LIBRARY_PATH": os.path.join(LAGOM, "lib"),
     })
@@ -677,7 +677,7 @@ def drag_resize(socket_name, runtime):
         "WAYLAND_DISPLAY": socket_name,
         "XDG_RUNTIME_DIR": os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"),
         "SDE_STATE_DIR": os.path.join(runtime, "state"),
-        "SDE_WM_PORTAL_PATH": os.path.join(runtime, "wm"),
+        "LIBWM_WM_PORTAL_PATH": os.path.join(runtime, "wm"),
         "SERENITY_RES_ROOT": SERENITY_RES,
         "LD_LIBRARY_PATH": os.path.join(LAGOM, "lib"),
     })
@@ -713,7 +713,7 @@ def resize_storm(socket_name, runtime):
         "WAYLAND_DISPLAY": socket_name,
         "XDG_RUNTIME_DIR": os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"),
         "SDE_STATE_DIR": os.path.join(runtime, "state"),
-        "SDE_WM_PORTAL_PATH": os.path.join(runtime, "wm"),
+        "LIBWM_WM_PORTAL_PATH": os.path.join(runtime, "wm"),
         "SERENITY_RES_ROOT": SERENITY_RES,
         "LD_LIBRARY_PATH": os.path.join(LAGOM, "lib"),
     })
@@ -776,7 +776,7 @@ def run_one(seed, duration, args):
             "XDG_DATA_HOME": os.path.join(runtime, "data"),
             "XDG_CONFIG_HOME": os.path.join(runtime, "config"),
             "SDE_STATE_DIR": os.path.join(runtime, "state"),
-            "SDE_WM_PORTAL_PATH": os.path.join(runtime, "wm"),
+            "LIBWM_WM_PORTAL_PATH": os.path.join(runtime, "wm"),
             "SERENITY_RES_ROOT": SERENITY_RES,
             "LD_LIBRARY_PATH": os.path.join(LAGOM, "lib"),
         })

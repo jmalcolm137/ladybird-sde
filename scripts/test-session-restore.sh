@@ -127,7 +127,7 @@ type_text() {
 
 start_compositor() {
     env -u WAYLAND_DISPLAY -u DISPLAY WLR_BACKENDS=headless WLR_HEADLESS_OUTPUTS=1 \
-        SDE_WM_PORTAL_PATH="$WORK/wm" SERENITY_RES_ROOT="$SERENITY/Base/res" \
+        LIBWM_WM_PORTAL_PATH="$WORK/wm" SERENITY_RES_ROOT="$SERENITY/Base/res" \
         LD_LIBRARY_PATH="$LAGOM/lib" XDG_RUNTIME_DIR="$RUNTIME_DIR" \
         "$COMPOSITOR" -n "$SOCK" >"$WORK/compositor.log" 2>&1 &
     COMP_PID=$!
