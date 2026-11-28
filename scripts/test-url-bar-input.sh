@@ -178,7 +178,14 @@ wait_for_navigate() {
     return 1
 }
 
-# --- 0. Clicking the address bar lets typing replace the address --------------
+# --- 0. A fresh window starts with the address bar focused --------------------
+sleep 4  # let the engine attach the tab and the page take focus
+type_text "$BASE/a.html"
+chord 28 # Return
+wait_for_navigate "$BASE/a.html" 10 || true
+check "a fresh window takes the typed address" $?
+
+# --- 1. Clicking the address bar lets typing replace the address --------------
 click_at "$((WIN_X + 400))" "$((WIN_Y + 70))"
 sleep 0.4
 type_text "$BASE/a.html"
@@ -186,7 +193,7 @@ chord 28 # Return
 wait_for_navigate "$BASE/a.html" 10 || true
 check "clicking the address bar lets typing replace the address" $?
 
-# --- 1. A loading page must not overwrite what the user is typing -------------
+# --- 2. A loading page must not overwrite what the user is typing -------------
 focus_location
 type_text "$BASE/slow.html"
 chord 28 # Return
@@ -204,7 +211,7 @@ for _ in $(seq 1 100); do grep -q 'GET /a.html' "$WORK/server.log" && break; sle
 grep -q 'GET /a.html' "$WORK/server.log" || true
 check "typed URL is the page that loads" $?
 
-# --- 2. Clicking the bar on a loaded page replaces the whole address ----------
+# --- 3. Clicking the bar on a loaded page replaces the whole address ----------
 click_at "$((WIN_X + 400))" "$((WIN_Y + 70))"
 sleep 0.3
 type_text "$BASE/titled.html"
@@ -212,7 +219,7 @@ chord 28 # Return
 wait_for_navigate "$BASE/titled.html" 10 || true
 check "clicking a loaded page's address bar replaces the address" $?
 
-# --- 3. A title-only autocomplete match must not hijack Enter -----------------
+# --- 4. A title-only autocomplete match must not hijack Enter -----------------
 sleep 1
 focus_location
 type_text "$BASE/titled.html"

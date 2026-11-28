@@ -933,8 +933,12 @@ BrowserTab& BrowserWindow::add_tab(String const& url, bool activate, bool reques
         tab_pointer->set_status("Not loaded"sv);
     }
 
-    if (activate)
+    if (activate) {
         m_tab_widget->set_active_widget(tab_pointer->root().ptr());
+        // A new tab is an address to type, not a page to read.
+        if (url.is_empty() && m_window && m_window->is_visible())
+            tab_pointer->focus_location();
+    }
 
     sync_active_tab_chrome();
     update_action_state();
@@ -1819,8 +1823,16 @@ void BrowserWindow::close_other_tabs(BrowserTab& keep)
 void BrowserWindow::show()
 {
     m_window->show();
-    if (auto* tab = active_tab())
-        tab->web_view().set_focus(true);
+    if (auto* tab = active_tab()) {
+        // A fresh window starts on the new-tab page: the user's first action is
+        // to type an address, so the address bar takes focus (typing into the
+        // page instead would submit to whatever search field it has). A restored
+        // tab has a page to read, so it keeps focus.
+        if (tab->initial_url().is_empty() || tab->current_url().is_empty())
+            tab->focus_location();
+        else
+            tab->web_view().set_focus(true);
+    }
 }
 
 }
