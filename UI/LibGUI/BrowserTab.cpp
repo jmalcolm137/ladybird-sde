@@ -255,11 +255,16 @@ BrowserTab::BrowserTab(EngineClient& engine, GUI::Window& window, GUI::Action& b
     m_location_box->set_preferred_width(GUI::SpecialDimension::Grow);
     m_location_box->set_fixed_height(24);
     m_location_box->on_return_pressed = [this] {
-        if (m_autocomplete_visible) {
+        // Enter navigates what the user typed. A highlighted suggestion is only
+        // used when they moved to it with the arrow keys; otherwise the first
+        // result would quietly replace their URL (and often send it to the
+        // search engine).
+        if (m_autocomplete_visible && m_autocomplete_user_selected) {
             accept_autocomplete();
             return;
         }
 
+        hide_autocomplete();
         auto text = String::from_byte_string(m_location_box->text()).release_value();
         if (text.is_empty())
             return;
@@ -270,6 +275,7 @@ BrowserTab::BrowserTab(EngineClient& engine, GUI::Window& window, GUI::Action& b
         if (m_applying_inline_completion)
             return;
 
+        m_location_edited = true;
         auto text = String::from_byte_string(m_location_box->text()).release_value();
         if (m_inline_completion_active) {
             // The user edited the selected completion suffix. Deleting it, or typing over it without growing past
@@ -328,6 +334,10 @@ BrowserTab::BrowserTab(EngineClient& engine, GUI::Window& window, GUI::Action& b
         hide_autocomplete();
     };
     m_location_box->on_focusin = [this] {
+        // From the moment the box has focus, the address belongs to the user:
+        // a redirect or a restored tab must not rewrite it under their cursor,
+        // even before the first keystroke.
+        m_location_edited = true;
         // A fresh editing session should offer a completion even if the last one was dismissed with Backspace.
         m_inline_completion_suppressed = false;
         if (!m_location_box->text().is_empty() && m_autocomplete_timer) {
@@ -336,6 +346,7 @@ BrowserTab::BrowserTab(EngineClient& engine, GUI::Window& window, GUI::Action& b
         }
     };
     m_location_box->on_focusout = [this] {
+        m_location_edited = false;
         if (m_autocomplete_hide_timer)
             m_autocomplete_hide_timer->start();
     };
@@ -634,6 +645,7 @@ void BrowserTab::detach()
 void BrowserTab::navigate(String const& url)
 {
     m_inline_completion_active = false;
+    m_location_edited = false;
     m_inline_base_query = url;
     m_last_location_text = url;
     hide_autocomplete();
@@ -873,10 +885,21 @@ void BrowserTab::set_history(bool can_go_back, bool can_go_forward)
 
 void BrowserTab::set_url(String const& url)
 {
+    // A loading page, a redirect or a restored tab must not replace the text
+    // the user is typing, nor close the completion list they are using.
+    if (m_location_box->is_focused() && m_location_edited) {
+        update_site_button();
+        return;
+    }
+
     hide_autocomplete();
+    m_location_edited = false;
 
     if (m_location_box->text() != url.to_byte_string()) {
-        m_location_box->set_text(url.bytes_as_string_view());
+        // Programmatic update: do not treat it as a user edit.
+        m_location_box->set_text(url.bytes_as_string_view(), GUI::AllowCallback::No);
+        m_last_location_text = url;
+        m_inline_base_query = url;
         if (on_url_change)
             on_url_change(url);
     }
@@ -1092,6 +1115,7 @@ void BrowserTab::set_autocomplete_results(u64 request_id, JsonArray const& items
     }
 
     m_autocomplete_table->set_cursor(m_autocomplete_model->index(0), GUI::AbstractView::SelectionUpdate::Set);
+    m_autocomplete_user_selected = false;
 
     if (!m_inline_completion_suppressed && autocomplete_row_can_inline(0))
         apply_inline_completion_for_row(0);
@@ -1172,6 +1196,13 @@ void BrowserTab::apply_inline_completion(String const& completion)
     if (completion.bytes_as_string_view().length() <= m_inline_base_query.bytes_as_string_view().length())
         return;
 
+    // Completing in the middle of an address (or over a selection) replaces
+    // text the user is working on. Only extend a caret at the end.
+    if (m_location_box->has_selection())
+        return;
+    if (m_location_box->cursor().column() != m_location_box->text().length())
+        return;
+
     if (Core::Environment::has("LADYBIRD_SDE_TEST_LOG_INLINE_COMPLETION"sv))
         warnln("inline completion: {}", completion);
 
@@ -1244,6 +1275,7 @@ void BrowserTab::hide_autocomplete()
         m_autocomplete_overlay->set_visible(false);
 
     m_autocomplete_visible = false;
+    m_autocomplete_user_selected = false;
     // Invalidate any request still in flight so a late result cannot reopen
     // the list after navigation or focus loss.
     ++m_autocomplete_request_id;
@@ -1281,6 +1313,8 @@ void BrowserTab::move_autocomplete_selection(int delta)
 {
     if (!m_autocomplete_visible || !m_autocomplete_table || delta == 0)
         return;
+
+    m_autocomplete_user_selected = true;
 
     auto movement = delta < 0
         ? GUI::AbstractView::CursorMovement::Up

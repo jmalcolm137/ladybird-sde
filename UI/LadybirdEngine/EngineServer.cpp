@@ -1250,6 +1250,51 @@ void EngineServer::handle_navigate(u64 tab_id, JsonObject const& command)
     perform_navigation(*tab, url.has_value() ? *url : String {}, user_input);
 }
 
+// A dotted, space-free input that the public suffix list does not know (an
+// intranet or development host, say) is still a host to the person typing it.
+// Classified as a search it would instead reach the search engine, which reads
+// as "my URL was thrown away".
+static Optional<URL::URL> host_like_input_url(StringView input)
+{
+    auto trimmed = input.trim_whitespace();
+    if (trimmed.find_any_of(" \t"sv).has_value())
+        return {};
+    if (!trimmed.contains('.'))
+        return {};
+    if (trimmed.contains("://"sv) || trimmed.starts_with("about:"sv) || trimmed.starts_with("file:"sv))
+        return {};
+
+    auto url = URL::Parser::basic_parse(ByteString::formatted("https://{}", trimmed));
+    if (!url.has_value())
+        return {};
+
+    // Keep the host Optional alive while its domain is inspected.
+    auto host = url->host();
+    if (!host.has_value() || !host->is_domain())
+        return {};
+
+    auto const& domain = host->get<String>();
+    auto domain_view = domain.bytes_as_string_view();
+    auto last_dot = domain_view.find_last('.');
+    if (!last_dot.has_value())
+        return {};
+
+    auto tld = domain_view.substring_view(*last_dot + 1);
+    if (tld.length() < 2)
+        return {};
+    bool tld_has_letter = false;
+    for (auto byte : tld.bytes()) {
+        if (is_ascii_alpha(byte))
+            tld_has_letter = true;
+        else if (!is_ascii_digit(byte) && byte != '-')
+            return {};
+    }
+    if (!tld_has_letter || tld.starts_with('-') || tld.ends_with('-'))
+        return {};
+
+    return url;
+}
+
 void EngineServer::perform_navigation(Tab& tab, String const& url, bool user_input)
 {
     if (url.is_empty()) {
@@ -1259,7 +1304,14 @@ void EngineServer::perform_navigation(Tab& tab, String const& url, bool user_inp
 
     if (user_input) {
         auto settings = WebView::Application::settings().search_engine_settings();
-        if (auto parsed = WebView::sanitize_url(url.bytes_as_string_view(), settings.engine); parsed.has_value())
+        auto parsed = WebView::sanitize_url(url.bytes_as_string_view(), settings.engine);
+        if (!WebView::location_looks_like_url(url.bytes_as_string_view())) {
+            if (auto as_url = host_like_input_url(url.bytes_as_string_view()); as_url.has_value())
+                parsed = *as_url;
+        }
+        if (Core::Environment::has("LADYBIRD_SDE_TEST_LOG_NAVIGATION"sv))
+            warnln("engine navigate: '{}' -> '{}'", url, parsed.has_value() ? parsed->serialize() : String { "(search/new tab)"_string });
+        if (parsed.has_value())
             tab.view->load_from_browser_ui(*parsed);
         else
             tab.view->load_from_browser_ui(WebView::Application::settings().new_tab_page_url());

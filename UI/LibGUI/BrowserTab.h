@@ -233,6 +233,8 @@ private:
     Optional<u32> m_selected_select_item;
     double m_zoom_level { 1.0 };
     bool m_select_dropdown_visible { false };
+    bool m_location_edited { false };
+    bool m_autocomplete_user_selected { false };
     bool m_input_method_enabled { false };
     bool m_page_input_method_enabled { false };
     Optional<Gfx::IntRect> m_page_caret_rect;
