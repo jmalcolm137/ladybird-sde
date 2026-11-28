@@ -334,6 +334,11 @@ BrowserTab::BrowserTab(EngineClient& engine, GUI::Window& window, GUI::Action& b
         hide_autocomplete();
     };
     m_location_box->on_focusin = [this] {
+        // Clicking the address bar selects the whole address, so typing replaces
+        // it. Without this the first character lands inside the current URL and
+        // the submission is a mangled address. A second click places the caret
+        // for editing.
+        m_location_box->select_all();
         // From the moment the box has focus, the address belongs to the user:
         // a redirect or a restored tab must not rewrite it under their cursor,
         // even before the first keystroke.

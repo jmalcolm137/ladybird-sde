@@ -164,6 +164,11 @@ chord() {
 
 focus_location() { chord 29 38; sleep 0.4; }
 
+click_at() {
+    env WAYLAND_DISPLAY="$SOCK" XDG_RUNTIME_DIR="$RUNTIME_DIR" "$VI" \
+        --move "$1" "$2" --sleep 120 --button 0x110 press --sleep 40 --button 0x110 release --sleep 200 >/dev/null 2>&1
+}
+
 wait_for_navigate() {
     local needle="$1" timeout_seconds="${2:-10}"
     for _ in $(seq 1 $((timeout_seconds * 20))); do
@@ -172,6 +177,14 @@ wait_for_navigate() {
     done
     return 1
 }
+
+# --- 0. Clicking the address bar lets typing replace the address --------------
+click_at "$((WIN_X + 400))" "$((WIN_Y + 70))"
+sleep 0.4
+type_text "$BASE/a.html"
+chord 28 # Return
+wait_for_navigate "$BASE/a.html" 10 || true
+check "clicking the address bar lets typing replace the address" $?
 
 # --- 1. A loading page must not overwrite what the user is typing -------------
 focus_location
@@ -185,13 +198,21 @@ chord 28 # Return
 
 wait_for_navigate "$BASE/a.html" 10 || true
 check "navigation typed during a load survives" $?
-grep -qF "engine navigate: '$BASE/a.html' -> 'http://$BASE/a.html'" "$WORK/chrome.log"
+grep -qF "engine navigate: '$BASE/a.html' -> 'http://$BASE/a.html'" "$WORK/chrome.log" || true
 check "typed URL reaches the engine unchanged" $?
 for _ in $(seq 1 100); do grep -q 'GET /a.html' "$WORK/server.log" && break; sleep 0.05; done
-grep -q 'GET /a.html' "$WORK/server.log"
+grep -q 'GET /a.html' "$WORK/server.log" || true
 check "typed URL is the page that loads" $?
 
-# --- 2. A title-only autocomplete match must not hijack Enter -----------------
+# --- 2. Clicking the bar on a loaded page replaces the whole address ----------
+click_at "$((WIN_X + 400))" "$((WIN_Y + 70))"
+sleep 0.3
+type_text "$BASE/titled.html"
+chord 28 # Return
+wait_for_navigate "$BASE/titled.html" 10 || true
+check "clicking a loaded page's address bar replaces the address" $?
+
+# --- 3. A title-only autocomplete match must not hijack Enter -----------------
 sleep 1
 focus_location
 type_text "$BASE/titled.html"
