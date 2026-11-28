@@ -826,9 +826,8 @@
             "sources": [
                 {
                     "type": "file",
-                    "url": "https://raw.githubusercontent.com/chromium/chromium/aa04f175415addb04bb78936b0d8b973fbd8ea61/net/http/transport_security_state_static.json",
                     "dest": "Caches/HSTSPreload/",
-                    "sha256": "4ca70f051571a198246bc337bd357f759fb8f9fdeddbe66b65960997540ee163"
+                    "path": "vendor/transport_security_state_static.json"
                 },
                 {
                     "type": "shell",
@@ -848,7 +847,8 @@
                         "vcpkg_installed",
                         "Tests/LibWeb/WPT",
                         "Meta/CMake/flatpak/sources",
-                        ".flatpak-builder"
+                        ".flatpak-builder",
+                        "Meta/CMake/flatpak/vendor"
                     ]
                 },
                 "cargo-sources.json"
